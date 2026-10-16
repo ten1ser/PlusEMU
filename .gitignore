@@ -280,5 +280,7 @@ __pycache__/
 .DS_Store
 
 # Server-minted camera media
+/plugins/
+/revisions/
 /camera/
 /camera-media/

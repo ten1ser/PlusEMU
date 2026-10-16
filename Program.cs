@@ -126,7 +126,7 @@ public static class Program
 
     public static IServiceCollection AddAssignableTo(this IServiceCollection services, IEnumerable<Assembly> assemblies, Type type, ServiceLifetime lifetime = ServiceLifetime.Singleton) =>
         services.Scan(scan => scan.FromAssemblies(assemblies)
-            .AddClasses(classes => classes.Where(t => t.IsAssignableTo(type) && !t.IsAbstract && !t.IsInterface))
+            .AddClasses(classes => classes.Where(t => t.IsAssignableTo(type) && !t.IsAbstract && !t.IsInterface && !t.IsNestedPrivate))
             .UsingRegistrationStrategy(RegistrationStrategy.Append)
             .AsSelfWithInterfaces()
             .WithLifetime(lifetime));
@@ -142,7 +142,7 @@ public static class Program
         }
 
         services.Scan(scan => scan.FromAssemblies(assembly)
-            .AddClasses(classes => classes.Where(c => c.GetInterface($"I{c.Name}") != null))
+            .AddClasses(classes => classes.Where(c => !c.IsNestedPrivate && c.GetInterface($"I{c.Name}") != null))
             .UsingRegistrationStrategy(RegistrationStrategy.Skip)
             .AsSelfWithInterfaces()
             .WithSingletonLifetime());

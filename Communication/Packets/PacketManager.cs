@@ -30,14 +30,23 @@ public sealed class PacketManager : IPacketManager, IDisposable
         _logger = logger;
 
         foreach (var packet in incomingPackets) {
-            var field = typeof(ClientPacketHeader).GetField(packet.GetType().Name, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+            var explicitHeader = packet.GetType().GetCustomAttribute<PacketHeaderAttribute>();
+            uint header;
 
-            if (field == null) {
-                _logger.LogWarning("No incoming header defined for {packet}", packet.GetType().Name);
-                continue;
+            if (explicitHeader != null) {
+                header = explicitHeader.Id;
+            }
+            else {
+                var field = typeof(ClientPacketHeader).GetField(packet.GetType().Name, BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
+
+                if (field == null) {
+                    _logger.LogWarning("No incoming header defined for {packet}", packet.GetType().Name);
+                    continue;
+                }
+
+                header = field.GetRawConstantValue() is uint id ? id : throw new InvalidOperationException($"{nameof(ClientPacketHeader)}.{field.Name} is not a packet ID constant.");
             }
 
-            var header = field.GetRawConstantValue() is uint id ? id : throw new InvalidOperationException($"{nameof(ClientPacketHeader)}.{field.Name} is not a packet ID constant.");
             _incomingPackets.Add(header, packet);
             _packetNames.Add(header, packet.GetType().Name);
 
