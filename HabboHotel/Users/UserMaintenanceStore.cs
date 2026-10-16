@@ -15,8 +15,16 @@ public interface IUserMaintenanceStore
     string? ReadMotto(int userId);
 }
 
+/// <summary>Allows related writes to participate in the native wallet transaction.</summary>
+public interface ITransactionalUserMaintenanceStore : IUserMaintenanceStore
+{
+    /// <summary>The callback runs after the row write, before commit. Throwing rolls back the entire transaction.</summary>
+    bool TryWriteCurrency(int userId, UserCurrency currency, int value, Action<IDbConnection, IDbTransaction, int>? beforeCommit);
+    (string? Error, int Balance) ChangeCurrency(int userId, UserCurrency currency, long delta, Action<IDbConnection, IDbTransaction, int>? beforeCommit);
+}
+
 /// <summary>Parameterized maintenance SQL; credits live in users, activity points in user_currencies by a closed enum switch.</summary>
-public sealed class UserMaintenanceStore(IDatabase database) : IUserMaintenanceStore
+public sealed class UserMaintenanceStore(IDatabase database) : ITransactionalUserMaintenanceStore
 {
     public int? ReadCurrency(int userId, UserCurrency currency)
     {
@@ -32,6 +40,9 @@ public sealed class UserMaintenanceStore(IDatabase database) : IUserMaintenanceS
 
     // Existence is the row contract: the row is locked, must exist exactly once, and an identical value still succeeds.
     public bool TryWriteCurrency(int userId, UserCurrency currency, int value)
+        => TryWriteCurrency(userId, currency, value, null);
+
+    public bool TryWriteCurrency(int userId, UserCurrency currency, int value, Action<IDbConnection, IDbTransaction, int>? beforeCommit)
     {
         using var connection = database.Connection();
         connection.Open();
@@ -48,12 +59,16 @@ public sealed class UserMaintenanceStore(IDatabase database) : IUserMaintenanceS
             UserCurrencyStore.Set(connection, userId, PointsType(currency), value, transaction);
         }
 
+        beforeCommit?.Invoke(connection, transaction, value);
         transaction.Commit();
 
         return true;
     }
 
     public (string? Error, int Balance) ChangeCurrency(int userId, UserCurrency currency, long delta)
+        => ChangeCurrency(userId, currency, delta, null);
+
+    public (string? Error, int Balance) ChangeCurrency(int userId, UserCurrency currency, long delta, Action<IDbConnection, IDbTransaction, int>? beforeCommit)
     {
         using var connection = database.Connection();
         connection.Open();
@@ -76,6 +91,7 @@ public sealed class UserMaintenanceStore(IDatabase database) : IUserMaintenanceS
             UserCurrencyStore.Set(connection, userId, PointsType(currency), (int)balance, transaction);
         }
 
+        beforeCommit?.Invoke(connection, transaction, (int)balance);
         transaction.Commit();
 
         return (null, (int)balance);
