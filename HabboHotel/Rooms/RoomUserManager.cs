@@ -344,8 +344,8 @@ public class RoomUserManager
             }
 
             if (item != null) {
-                if (session.GetHabbo().IsTeleporting && item.Definition.InteractionType == InteractionType.WiredRoomLinker) {
-                    // Forwarded through a WIRED Room Linker: the user arrives standing on it; it has no door to flash.
+                if (session.GetHabbo().IsTeleporting && (item.Definition.InteractionType == InteractionType.WiredRoomLinker || item.Definition.IsStepThroughArrow)) {
+                    // Forwarded through a WIRED Room Linker or a step-through arrow: the user arrives standing on it; it has no door to flash.
                     if (UsesV2Movement) {
                         user.InitializePosition(item.GetX, item.GetY, item.GetZ);
                     }
@@ -354,9 +354,14 @@ public class RoomUserManager
                     }
 
                     user.SetRot(item.Rotation, false);
+                    if (item.Definition.IsStepThroughArrow) {
+                        user.ArrivalArrowId = item.Id;
+                    }
+
                     // Nothing walks the user out of a linker, so the entry ends here (the wired entry snapshot was taken above).
                     session.GetHabbo().IsTeleporting = false;
                     session.GetHabbo().TeleporterId = 0;
+                    session.GetHabbo().TeleportingRoomId = 0;
                 }
                 else if (session.GetHabbo().IsTeleporting) {
                     item.LegacyDataString = "2";
@@ -1301,6 +1306,7 @@ public class RoomUserManager
         }
 
         var wasLaying = user.Statusses.ContainsKey("lay");
+        user.ReleaseStaleArrival(_room);
 
         try {
             var isBot = user.IsBot;
@@ -1530,7 +1536,11 @@ public class RoomUserManager
                             break;
                         }
                     case InteractionType.Arrow: {
-                            if (user.GoalX == item.GetX && user.GoalY == item.GetY) {
+                            if (item.Definition.IsStepThroughArrow || (user.GoalX == item.GetX && user.GoalY == item.GetY)) {
+                                if (item.Definition.IsStepThroughArrow && (user.IsBot || item.Id == user.ArrivalArrowId)) {
+                                    continue;
+                                }
+
                                 if (user == null || user.GetClient() == null || user.GetClient().GetHabbo() == null) {
                                     continue;
                                 }
@@ -1551,12 +1561,20 @@ public class RoomUserManager
                                     if (teleRoomId == room.RoomId) {
                                         var targetItem = room.GetRoomItemHandler().GetItem(linkedTele);
 
+                                        if (item.Definition.IsStepThroughArrow && (targetItem == null || targetItem.Id == item.Id || targetItem.Definition.InteractionType != InteractionType.Arrow || !targetItem.Definition.IsStepThroughArrow)) {
+                                            continue;
+                                        }
+
                                         if (targetItem == null) {
                                             if (user.GetClient() != null) {
                                                 user.GetClient().SendWhisper("Hey, that arrow is poorly!");
                                             }
 
                                             return;
+                                        }
+
+                                        if (item.Definition.IsStepThroughArrow) {
+                                            user.ArrivalArrowId = targetItem.Id;
                                         }
 
                                         room.GetGameMap().TeleportToItem(user, targetItem);

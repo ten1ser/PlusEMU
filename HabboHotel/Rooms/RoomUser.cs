@@ -64,6 +64,7 @@ public class RoomUser
     public bool IsRolling = false;
     public bool IsSitting = false;
     public bool IsWalking;
+    public uint ArrivalArrowId;
     public int LastBubble = 0;
     public DateTimeOffset? LastInteractionAt;
     public Item? LastItem = null;
@@ -170,6 +171,19 @@ public class RoomUser
     public Point Coordinate => new(X, Y);
 
     public bool IsPet => IsBot && BotData.IsPet;
+
+    public void ReleaseStaleArrival(Room room)
+    {
+        if (ArrivalArrowId == 0) {
+            return;
+        }
+
+        var arrival = room.GetRoomItemHandler().GetItem(ArrivalArrowId);
+
+        if (arrival == null || arrival.GetX != X || arrival.GetY != Y) {
+            ArrivalArrowId = 0;
+        }
+    }
 
     public int CurrentEffect => GetClient()?.GetHabbo()?.Effects?.CurrentEffect ?? 0;
 

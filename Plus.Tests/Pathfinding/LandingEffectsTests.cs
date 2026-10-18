@@ -154,6 +154,95 @@ public partial class PlacedFurniRoomTests
     }
 
     [Fact]
+    public void LandingStepThroughArrowTeleportsWithoutFinalGoal()
+    {
+        var arrow = Add(10, 1, 1, type: InteractionType.Arrow);
+        arrow.Definition.IsStepThroughArrow = true;
+        var pair = Add(11, 3, 2, z: 0.75, type: InteractionType.Arrow);
+        pair.Definition.IsStepThroughArrow = true;
+        InitializeNativeState(pair);
+        var actor = LandingActor();
+        actor.GoalX = 5;
+        actor.GoalY = 5;
+        new LandingEffects(_room, LandingDatabase(11, RoomId)).Apply(actor, false);
+        Assert.Equal((3, 2), (actor.X, actor.Y));
+        Assert.Equal(11u, actor.ArrivalArrowId);
+    }
+
+    [Fact]
+    public void LandingStepThroughArrowPairDoesNotBounceBackOnRepeatedStatusUpdates()
+    {
+        var first = Add(10, 1, 1, type: InteractionType.Arrow);
+        first.Definition.IsStepThroughArrow = true;
+        var second = Add(11, 3, 2, z: 0.75, type: InteractionType.Arrow);
+        second.Definition.IsStepThroughArrow = true;
+        InitializeNativeState(second);
+        var actor = LandingActor();
+        var effects = new LandingEffects(_room, LandingDatabase(11, RoomId));
+        effects.Apply(actor, false);
+        Assert.Equal((3, 2), (actor.X, actor.Y));
+        effects.Apply(actor, false);
+        effects.Apply(actor, false);
+        Assert.Equal((3, 2), (actor.X, actor.Y));
+        Assert.Equal(11u, actor.ArrivalArrowId);
+    }
+
+    [Fact]
+    public void LandingStepThroughArrowRearmsAfterStepOffAndReenter()
+    {
+        var first = Add(10, 1, 1, type: InteractionType.Arrow);
+        first.Definition.IsStepThroughArrow = true;
+        var second = Add(11, 3, 2, z: 0.75, type: InteractionType.Arrow);
+        second.Definition.IsStepThroughArrow = true;
+        InitializeNativeState(second);
+        var actor = LandingActor();
+        var effects = new LandingEffects(_room, LandingDatabase(11, RoomId));
+        effects.Apply(actor, false);
+        Assert.Equal((3, 2), (actor.X, actor.Y));
+        actor.X = 4;
+        actor.Y = 4;
+        effects.Apply(actor, false);
+        Assert.Equal(0u, actor.ArrivalArrowId);
+        actor.X = 1;
+        actor.Y = 1;
+        actor.GoalX = 1;
+        actor.GoalY = 1;
+        effects.Apply(actor, false);
+        Assert.Equal((3, 2), (actor.X, actor.Y));
+        Assert.Equal(11u, actor.ArrivalArrowId);
+    }
+
+    [Fact]
+    public void LandingStepThroughArrowSkipsBotsAndInvalidTargets()
+    {
+        var arrow = Add(10, 1, 1, type: InteractionType.Arrow);
+        arrow.Definition.IsStepThroughArrow = true;
+        var teleport = Add(11, 3, 2, z: 0.75, type: InteractionType.Teleport);
+        InitializeNativeState(teleport);
+        var bot = LandingActor();
+        bot.BotData = (RoomBot)RuntimeHelpers.GetUninitializedObject(typeof(RoomBot));
+        new LandingEffects(_room, LandingDatabase(11, RoomId)).Apply(bot, false);
+        Assert.Equal((1, 1), (bot.X, bot.Y));
+        var actor = LandingActor();
+        new LandingEffects(_room, LandingDatabase(11, RoomId)).Apply(actor, false);
+        Assert.Equal((1, 1), (actor.X, actor.Y));
+        Assert.Equal(0u, actor.ArrivalArrowId);
+    }
+
+    [Fact]
+    public void LandingStepThroughArrowWithMissingPairDoesNotFreezeWalking()
+    {
+        var arrow = Add(10, 1, 1, type: InteractionType.Arrow);
+        arrow.Definition.IsStepThroughArrow = true;
+        var actor = LandingActor();
+        actor.AllowOverride = false;
+        actor.CanWalk = false;
+        new LandingEffects(_room, LandingDatabase(0, RoomId)).Apply(actor, false);
+        Assert.True(actor.CanWalk);
+        Assert.Equal((1, 1), (actor.X, actor.Y));
+    }
+
+    [Fact]
     public void LandingUnlinkedArrowUnlocksWalking()
     {
         Add(10, 1, 1, type: InteractionType.Arrow);

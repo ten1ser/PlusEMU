@@ -14,13 +14,15 @@ public class ItemDataManager : IItemDataManager, IStartable
 {
     private readonly ILogger<ItemDataManager> _logger;
     private readonly IDatabase _database;
+    private readonly IReadOnlyList<IItemDefinitionCustomizer> _customizers;
     public Dictionary<int, uint> Gifts { get; private set; } = new(0); //<SpriteId, Item>
     public Dictionary<uint, ItemDefinition> Items { get; private set; } = new(0);
 
-    public ItemDataManager(ILogger<ItemDataManager> logger, IDatabase database)
+    public ItemDataManager(ILogger<ItemDataManager> logger, IDatabase database, IEnumerable<IItemDefinitionCustomizer>? customizers = null)
     {
         _logger = logger;
         _database = database;
+        _customizers = customizers?.ToList() ?? [];
     }
 
     public int StartOrder => 10;
@@ -98,6 +100,10 @@ public class ItemDataManager : IItemDataManager, IStartable
                         ExtraRot = FurnitureNumbers.BooleanFromCell(row["extra_rot"]),
                         FigureSetIds = ReadFigureSetIds(row.Table.Columns.Contains("custom_params") ? row["custom_params"] : null),
                     };
+
+                    foreach (var customizer in _customizers) {
+                        customizer.Customize(definition);
+                    }
 
                     gifts.TryAdd(definition.SpriteId, definition.Id);
                     items.Add(definition.Id, definition);

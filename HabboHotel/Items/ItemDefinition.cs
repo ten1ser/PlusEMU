@@ -50,4 +50,7 @@ public class ItemDefinition
 
     /// TODO @80O: I think this can be removed. Seems useless and unclear what its supposed to do.
     public bool ExtraRot { get; set; }
+
+    /// <summary>An arrow that teleports anyone who walks over it, not only a user whose goal is the arrow tile.</summary>
+    public bool IsStepThroughArrow { get; set; }
 }

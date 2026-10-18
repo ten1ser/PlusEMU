@@ -58,6 +58,38 @@ public class ItemDataManagerLoadTests
         Assert.Contains("#2", error.Message);
     }
 
+    [Fact]
+    public void CustomizersApplyOnLoadAndReloadOnlyToTheirExactItemName()
+    {
+        var customizer = new NameCustomizer("room_switcher2");
+        var manager = new ItemDataManager(new RecordingLogger(), null!, [customizer]);
+        var table = CreateFurnitureTable(typeof(string));
+        table.Rows.Add("1", "13", "room_switcher2", "Switcher", "s", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "default", "0", "0", "1", "", "0", "0", "0", "0");
+        table.Rows.Add("2", "14", "room_switcher2_other", "Other", "s", "1", "1", "1", "1", "0", "0", "1", "1", "1", "1", "1", "default", "0", "0", "1", "", "0", "0", "0", "0");
+
+        manager.Load(table);
+
+        Assert.True(manager.Items[1].IsStepThroughArrow);
+        Assert.False(manager.Items[2].IsStepThroughArrow);
+        manager.Load(table);
+        Assert.True(manager.Items[1].IsStepThroughArrow);
+        Assert.Equal(4, customizer.Calls);
+    }
+
+    private sealed class NameCustomizer(string name) : IItemDefinitionCustomizer
+    {
+        public int Calls { get; private set; }
+
+        public void Customize(ItemDefinition definition)
+        {
+            Calls++;
+
+            if (definition.ItemName == name) {
+                definition.IsStepThroughArrow = true;
+            }
+        }
+    }
+
     private static DataTable CreateFurnitureTable(Type booleanColumnType)
     {
         var table = new DataTable();

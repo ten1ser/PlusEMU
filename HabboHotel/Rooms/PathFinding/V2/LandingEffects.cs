@@ -25,6 +25,7 @@ public sealed class LandingEffects
     public void Apply(RoomUser actor, bool wasLaying)
     {
         var location = new Location(actor.X, actor.Y, actor.Z, actor.Movement.LocationRevision);
+        actor.ReleaseStaleArrival(_room);
 
         try {
             var items = SurfaceContacts.Of(_room, actor, _room.GetGameMap().GetAllRoomItemForSquare(actor.X, actor.Y));
@@ -141,7 +142,13 @@ public sealed class LandingEffects
 
     private bool ApplyArrow(RoomUser actor, Item item)
     {
-        if (actor.GoalX != item.GetX || actor.GoalY != item.GetY) {
+        var stepThrough = item.Definition.IsStepThroughArrow;
+
+        if (stepThrough && (actor.IsBot || item.Id == actor.ArrivalArrowId)) {
+            return true;
+        }
+
+        if (!stepThrough && (actor.GoalX != item.GetX || actor.GoalY != item.GetY)) {
             return true;
         }
 
@@ -167,6 +174,17 @@ public sealed class LandingEffects
         }
 
         if (roomId == _room.RoomId) {
+            if (stepThrough) {
+                if (!IsStepThroughTarget(target, item)) {
+                    return true;
+                }
+
+                actor.ArrivalArrowId = target!.Id;
+                _room.GetGameMap().TeleportToItem(actor, target);
+
+                return false;
+            }
+
             if (target == null) {
                 actor.GetClient().SendWhisper("Hey, that arrow is poorly!");
             }
@@ -183,6 +201,10 @@ public sealed class LandingEffects
 
         return false;
     }
+
+    private static bool IsStepThroughTarget(Item? target, Item source)
+        => target != null && target.Id != source.Id && target.Definition.InteractionType == InteractionType.Arrow
+            && target.Definition.IsStepThroughArrow;
 
     private void PrepareRoom(RoomUser actor, Habbo habbo, uint linked, uint roomId)
     {

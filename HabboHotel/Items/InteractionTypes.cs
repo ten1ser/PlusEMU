@@ -5,7 +5,7 @@ namespace Plus.HabboHotel.Items;
 public static class InteractionTypes
 {
     /// <summary>Furni sold as two linked halves (room_items_tele_links): teleporters and the WIRED Room Linker.</summary>
-    public static bool IsLinkedPair(InteractionType type) => type is InteractionType.Teleport or InteractionType.WiredRoomLinker;
+    public static bool IsLinkedPair(InteractionType type) => type is InteractionType.Teleport or InteractionType.WiredRoomLinker or InteractionType.Arrow;
 
     public static InteractionType GetTypeFromString(string type)
     {

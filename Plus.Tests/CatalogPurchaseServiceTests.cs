@@ -86,6 +86,7 @@ public sealed class CatalogPurchaseServiceTests
     [Theory]
     [InlineData(InteractionType.Teleport)]
     [InlineData(InteractionType.WiredRoomLinker)]
+    [InlineData(InteractionType.Arrow)]
     public async Task TeleportersAndRoomLinkersAreBoughtAsOneLinkedPair(InteractionType interaction)
     {
         var context = Context(interaction: interaction);
@@ -98,6 +99,18 @@ public sealed class CatalogPurchaseServiceTests
         Assert.NotNull(inventory.GetItem(700));
         Assert.NotNull(inventory.GetItem(701));
         Assert.Contains(context.Sent, packet => packet.Header == ServerPacketHeader.PurchaseOKComposer);
+    }
+
+    [Fact]
+    public async Task BulkArrowPurchaseCreatesOneIndependentPairPerUnit()
+    {
+        var context = Context(interaction: InteractionType.Arrow);
+
+        await context.Service.Purchase(context.Client, new(1, 2, "ignored", 3));
+
+        Assert.Equal(3, context.Factory.LinkedPairs);
+        Assert.Equal(6, context.Factory.Creates);
+        Assert.Equal(10 * 3, 100 - context.Habbo.Credits);
     }
 
     [Theory]

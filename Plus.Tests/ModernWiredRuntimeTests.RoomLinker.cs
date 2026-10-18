@@ -44,8 +44,10 @@ public partial class ModernWiredRuntimeTests
         Assert.Null(WiredRoomForwarding.Resolve([linker], "", _ => throw new Exception(), _ => 0, TestLogging.Logger));
     }
 
-    [Fact]
-    public void UserForwardedThroughARoomLinkerArrivesOnThePartnerWithoutFlashingIt()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void UserForwardedThroughARoomLinkerArrivesOnThePartnerWithoutFlashingIt(bool stepThrough)
     {
         using var f = new TeleportFixture();
         var (destination, _, _) = World();
@@ -53,6 +55,10 @@ public partial class ModernWiredRuntimeTests
         var partner = MakeItem(6, "wf_room_linker");
         partner.Definition.InteractionType = InteractionType.WiredRoomLinker;
         partner.Definition.Modes = 1;
+        if (stepThrough) {
+            partner.Definition.InteractionType = InteractionType.Arrow;
+            partner.Definition.IsStepThroughArrow = true;
+        }
         partner.ExtraData = new LegacyDataFormat { Data = "" };
         Assert.True(destination.GetRoomItemHandler().SetFloorItem(null!, partner, 2, 1, 0, true, false, false));
         f.Habbo.IsTeleporting = true;
@@ -66,6 +72,7 @@ public partial class ModernWiredRuntimeTests
         Assert.True(destination.GetRoomUserManager().AddAvatarToRoom(f.Client));
         var joined = Assert.IsType<RoomUser>(destination.GetRoomUserManager().GetRoomUserByHabbo(f.Habbo.Id));
         Assert.Equal((2, 1), (joined.X, joined.Y));
+        Assert.Equal(stepThrough ? partner.Id : 0u, joined.ArrivalArrowId);
         Assert.Equal(new WiredRoomEntrySnapshot(WiredRoomEntryMethod.Teleport, partner.Id), joined.WiredRoomEntry);
         Assert.Equal("", partner.LegacyDataString);
         Assert.Equal(0, partner.InteractingUser2);
