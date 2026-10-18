@@ -55,6 +55,7 @@ public static class PermissionKeys
     public const string CommandGoto = "command.goto";
     public const string CommandHa = "command.ha";
     public const string CommandHal = "command.hal";
+    public const string CommandHit = "command.hit";
     public const string CommandHidewired = "command.hidewired";
     public const string CommandIgnorewhispers = "command.ignorewhispers";
     public const string CommandIpban = "command.ipban";
