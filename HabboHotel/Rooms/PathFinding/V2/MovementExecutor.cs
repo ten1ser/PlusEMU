@@ -38,6 +38,12 @@ internal sealed class MovementExecutor(Room room, MovementContext context, Rebin
             return;
         }
 
+        if (actor.IsIncapacitated) {
+            actor.ReconcileIncapacitation();
+
+            return;
+        }
+
         state.TickLocationRevision = state.LocationRevision;
         rebind.Rebind(actor);
         context.RefreshMembership(actor);
@@ -56,6 +62,12 @@ internal sealed class MovementExecutor(Room room, MovementContext context, Rebin
     }
     private void PhaseC(RoomUser actor)
     {
+        if (actor.IsIncapacitated) {
+            actor.ReconcileIncapacitation();
+
+            return;
+        }
+
         if (!Eligible(actor)) {
             return;
         }

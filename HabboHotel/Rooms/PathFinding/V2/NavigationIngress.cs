@@ -11,7 +11,7 @@ public sealed partial class RoomNavigation
     public void Move(RoomUser actor, int x, int y, MoveOrigin origin, MoveFlags flags = MoveFlags.None,
         ApproachDescriptor? approach = null)
     {
-        if (!UsesExecutor || actor.Movement.State == NavState.Removing) {
+        if (!UsesExecutor || actor.Movement.State == NavState.Removing || actor.IsIncapacitated) {
             return;
         }
 

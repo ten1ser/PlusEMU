@@ -422,6 +422,10 @@ public class RoomUserManager
             AdmitSpawn(user);
         }
 
+        if (user.IsIncapacitated) {
+            user.ReconcileIncapacitation();
+        }
+
         _room.SendUser(user);
 
         if (_room.CheckRights(session, true)) {
@@ -1307,6 +1311,12 @@ public class RoomUserManager
 
         var wasLaying = user.Statusses.ContainsKey("lay");
         user.ReleaseStaleArrival(_room);
+
+        if (user.IsIncapacitated) {
+            user.ReconcileIncapacitation();
+
+            return;
+        }
 
         try {
             var isBot = user.IsBot;

@@ -36,7 +36,7 @@ public sealed class RoomAvatarActionService(TimeProvider clock, IQuestManager qu
 
         var user = room.GetRoomUserManager().GetRoomUserByHabbo(habbo.Id);
 
-        if (user == null || !room.GetGameMap().ValidTile(x, y)) {
+        if (user == null || user.IsIncapacitated || !room.GetGameMap().ValidTile(x, y)) {
             return;
         }
 
@@ -111,7 +111,7 @@ public sealed class RoomAvatarActionService(TimeProvider clock, IQuestManager qu
     {
         var user = room.GetRoomUserManager().GetRoomUserByHabbo(session.GetHabbo().Id);
 
-        if (user == null) {
+        if (user == null || user.IsIncapacitated) {
             return;
         }
 
@@ -157,7 +157,7 @@ public sealed class RoomAvatarActionService(TimeProvider clock, IQuestManager qu
     {
         var user = room.GetRoomUserManager().GetRoomUserByHabbo(session.GetHabbo().Id);
 
-        if (user == null) {
+        if (user == null || user.IsIncapacitated) {
             return;
         }
 
@@ -204,7 +204,7 @@ public sealed class RoomAvatarActionService(TimeProvider clock, IQuestManager qu
         var room = session.GetHabbo().CurrentRoom;
         var user = room.GetRoomUserManager().GetRoomUserByHabbo(session.GetHabbo().Id);
 
-        if (user == null || user.Statusses.ContainsKey("lie") || user.IsLying || user.RidingHorse || user.IsWalking) {
+        if (user == null || user.IsIncapacitated || user.Statusses.ContainsKey("lie") || user.IsLying || user.RidingHorse || user.IsWalking) {
             return;
         }
 

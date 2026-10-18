@@ -12,11 +12,22 @@ public static class PostureService
         actor.IsSitting = actor.IsLying = false;
 
         if (state.CurrentRef is not { } surface) {
+            if (actor.IsIncapacitated) {
+                actor.ReconcileIncapacitation();
+            }
+
             return;
         }
 
         actor.Z = state.SupportZ + RiderOffset(actor, surface);
         var slot = grid.Layered ? grid.SlotOf(surface) : surface.Tile;
+
+        if (actor.IsIncapacitated) {
+            actor.ClearIncapacitationBookkeeping();
+            actor.ReconcileIncapacitation();
+
+            return;
+        }
 
         if (slot < 0) {
             return;

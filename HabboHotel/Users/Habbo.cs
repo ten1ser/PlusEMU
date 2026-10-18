@@ -223,6 +223,8 @@ public class Habbo
 
     public Room? CurrentRoom { get; set; }
 
+    public bool IsIncapacitated { get; set; }
+
     internal void Save()
     {
         lock (WalletSync) {

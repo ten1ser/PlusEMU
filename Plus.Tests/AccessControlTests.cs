@@ -41,6 +41,23 @@ public sealed class AccessControlTests
     }
 
     [Fact]
+    public void OwnerWildcardGrantsCurrentAndFutureRegisteredKeysWithoutChangingNormalRoles()
+    {
+        var future = "command.future_custom";
+        var registry = PermissionKeys.All.Select(permission => permission.Key).Append(future).ToArray();
+        var owner = UserAccess.Create([new(Role(9, 1000, ["*"], 7))], registry: registry);
+        var normal = UserAccess.Create([new(Role(1, 1, [PermissionKeys.ModerationTool], 1))], registry: registry);
+
+        Assert.Contains(PermissionKeys.CommandSuperheal, registry);
+        Assert.True(owner.Can(PermissionKeys.CommandSuperheal));
+        Assert.True(owner.Can(future));
+        Assert.Equal(registry.Order(), owner.Keys.Order());
+        Assert.False(normal.Can(PermissionKeys.CommandSuperheal));
+        Assert.False(normal.Can(future));
+        Assert.Equal(new[] { PermissionKeys.ModerationTool }, normal.Keys.Order().ToArray());
+    }
+
+    [Fact]
     public void MultiRoleResolutionUnionsPermissionsAndTakesTheMaximumLimitAndSecurity()
     {
         var first = Role(1, 10, [PermissionKeys.CameraUse], 7, ("limit.daily_respects", 10));

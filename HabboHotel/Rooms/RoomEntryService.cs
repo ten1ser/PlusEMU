@@ -1,5 +1,6 @@
 using Plus.Communication.Packets.Outgoing.Rooms.Chat;
 using Plus.Communication.Packets.Outgoing.Rooms.Engine;
+using Plus.Core;
 using Plus.HabboHotel.GameClients;
 using Plus.HabboHotel.Items.Wired;
 using Plus.HabboHotel.Quests;
@@ -12,8 +13,10 @@ public interface IRoomEntryService
     void Enter(GameClient session);
 }
 
-public sealed class RoomEntryService(IQuestManager quests, TimeProvider clock, IRoomPollService polls, IRoomWordQuizService quizzes) : IRoomEntryService
+public sealed class RoomEntryService(IQuestManager quests, TimeProvider clock, IRoomPollService polls, IRoomWordQuizService quizzes, IEnumerable<IRoomEntryObserver>? observers = null) : IRoomEntryService
 {
+    private readonly IRoomEntryObserver[] _observers = observers?.ToArray() ?? [];
+
     public void Enter(GameClient session)
     {
         var habbo = session.GetHabbo();
@@ -62,6 +65,25 @@ public sealed class RoomEntryService(IQuestManager quests, TimeProvider clock, I
 
         polls.Offer(session);
         quizzes.Show(session);
+        NotifyObservers(session, room);
+    }
+
+    private void NotifyObservers(GameClient session, Room room)
+    {
+        var habbo = session.GetHabbo();
+
+        foreach (var observer in _observers) {
+            if (!ReferenceEquals(habbo.CurrentRoom, room) || room.GetRoomUserManager().GetRoomUserByHabbo(habbo.Id) == null) {
+                return;
+            }
+
+            try {
+                observer.Entered(session, room);
+            }
+            catch (Exception exception) {
+                ExceptionLogger.LogException(exception);
+            }
+        }
     }
 
     internal static int RemainingFloodSeconds(DateTimeOffset now, DateTimeOffset floodUntil) =>

@@ -30,7 +30,7 @@ internal sealed class V2MovementEngine : IMovementEngine
         navigation.Inputs.ItemPublished = Context.Approaches.CancelItem;
         var approaches = new ApproachCompletion(room, navigation, Context.Approaches);
         var commit = new CommitService(room, navigation, Context, _cancellation, fallback, approaches);
-        var intake = new CommandIntake(Context, _placement);
+        var intake = new CommandIntake(Context, _placement, _cancellation);
         var search = new MovementSearch(room, navigation, Context, _cancellation, fallback, approaches);
         var announce = new AnnounceService(room, navigation, Context, _cancellation, fallback);
         _executor = new(room, Context, _rebind, commit, intake, search, announce, new(room));

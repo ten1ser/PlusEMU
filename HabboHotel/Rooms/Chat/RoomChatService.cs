@@ -52,7 +52,7 @@ public sealed class RoomChatService(
 
         var user = room.GetRoomUserManager().GetRoomUserByHabbo(habbo.Id);
 
-        if (user == null) {
+        if (user == null || habbo.IsIncapacitated) {
             return;
         }
 
@@ -156,6 +156,10 @@ public sealed class RoomChatService(
         var room = habbo.CurrentRoom;
 
         if (room == null) {
+            return;
+        }
+
+        if (habbo.IsIncapacitated) {
             return;
         }
 

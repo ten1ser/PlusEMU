@@ -33,6 +33,25 @@ public sealed class RoomChatServiceTests
     private static readonly DateTimeOffset Now = new(2040, 1, 2, 3, 4, 5, TimeSpan.Zero);
 
     [Fact]
+    public async Task IncapacitatedPlayerCannotChatShoutWhisperOrDispatchCommands()
+    {
+        var world = new World();
+        world.Sender.GetHabbo().IsIncapacitated = true;
+
+        await world.Service.Chat(world.Sender, "blocked", 1);
+        await world.Service.Shout(world.Sender, "blocked", 1);
+        await world.Service.Whisper(world.Sender, "Bob blocked", 1);
+        await world.Service.Chat(world.Sender, ":lay", 1);
+
+        Assert.Empty(world.Logs.Entries);
+        Assert.Empty(world.Commands.Messages);
+        Assert.Empty(world.SenderPackets);
+        Assert.Empty(world.RecipientPackets);
+        Assert.Empty(world.Quests.Progresses);
+        Assert.Empty(world.Rewards.Progresses);
+    }
+
+    [Fact]
     public async Task HandlersDecodeFullPrimitiveRequestsAndDelegateOnly()
     {
         var service = new RecordingRoomChatService();

@@ -1,6 +1,6 @@
 namespace Plus.HabboHotel.Rooms.PathFinding;
 
-internal sealed class CommandIntake(MovementContext context, ForcePlacementService placement)
+internal sealed class CommandIntake(MovementContext context, ForcePlacementService placement, MovementCancellation cancellation)
 {
     public void Consume(RoomUser actor)
     {
@@ -12,6 +12,12 @@ internal sealed class CommandIntake(MovementContext context, ForcePlacementServi
         }
 
         state.ConsumedSequence = command.Sequence;
+
+        if (actor.IsIncapacitated) {
+            cancellation.Cancel(actor, command.Sequence);
+
+            return;
+        }
 
         if (actor.Frozen || !actor.CanWalk && command.Origin == MoveOrigin.User) {
             return;

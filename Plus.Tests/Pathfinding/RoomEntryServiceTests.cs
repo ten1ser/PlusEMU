@@ -116,6 +116,77 @@ public partial class PlacedFurniRoomTests
         Assert.Equal(0, clock.Reads);
     }
 
+    [Fact]
+    public void SuccessfulEntryNotifiesEachObserverOnceAfterMembershipAndIsolatesFailures()
+    {
+        var clock = new EntryClock();
+        var first = new RecordingObserver(null);
+        var failing = new RecordingObserver(new InvalidOperationException("observer failure"));
+        var last = new RecordingObserver(null);
+        var service = new RoomEntryService(EntryQuests, clock, EntryPolls, EntryWordQuiz, [first, failing, last]);
+
+        service.Enter(_client);
+
+        Assert.Equal(1, first.Calls);
+        Assert.Equal(1, failing.Calls);
+        Assert.Equal(1, last.Calls);
+        Assert.Same(_client, first.Session);
+        Assert.Same(_room, first.Room);
+        Assert.NotNull(_room.GetRoomUserManager().GetRoomUserByHabbo(7));
+    }
+
+    [Fact]
+    public void FailedAdmissionOrMissingRoomNotifiesNoObservers()
+    {
+        var clock = new EntryClock();
+        var observer = new RecordingObserver(null);
+        var service = new RoomEntryService(EntryQuests, clock, EntryPolls, EntryWordQuiz, [observer]);
+        _client.GetHabbo().CurrentRoom = null;
+
+        service.Enter(_client);
+
+        Assert.Equal(0, observer.Calls);
+    }
+
+    [Fact]
+    public void ObserverThatLeavesTheRoomStopsRemainingObservers()
+    {
+        var clock = new EntryClock();
+        var leaving = new RecordingObserver(null, () => _client.GetHabbo().CurrentRoom = null);
+        var later = new RecordingObserver(null);
+        var service = new RoomEntryService(EntryQuests, clock, EntryPolls, EntryWordQuiz, [leaving, later]);
+
+        service.Enter(_client);
+
+        Assert.Equal(1, leaving.Calls);
+        Assert.Equal(0, later.Calls);
+    }
+
+    private static IQuestManager EntryQuests => Proxy<IQuestManager>((method, _) =>
+        method == nameof(IQuestManager.QuestReminder) ? null : throw new InvalidOperationException(method));
+
+    private static IRoomPollService EntryPolls => Proxy<IRoomPollService>((method, _) =>
+        method == nameof(IRoomPollService.Offer) ? null : throw new InvalidOperationException(method));
+
+    private sealed class RecordingObserver(Exception? failure, Action? afterCall = null) : IRoomEntryObserver
+    {
+        public GameClient? Session;
+        public Room? Room;
+        public int Calls;
+
+        public void Entered(GameClient session, Room room)
+        {
+            Calls++;
+            Session = session;
+            Room = room;
+            afterCall?.Invoke();
+
+            if (failure != null) {
+                throw failure;
+            }
+        }
+    }
+
     private static IRoomWordQuizService EntryWordQuiz => Proxy<IRoomWordQuizService>((method, _) =>
         method == "Show" ? null : throw new InvalidOperationException(method));
 

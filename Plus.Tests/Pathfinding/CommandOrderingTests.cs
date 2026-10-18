@@ -34,4 +34,38 @@ public partial class PlacedFurniRoomTests
         ExecutorTick();
         Assert.Equal((0, 2), (actor.X, actor.Y));
     }
+
+    [Fact]
+    public void QueuedWalkIsCancelledWhenIncapacitatedBeforeIntake()
+    {
+        var actor = ExecutorActor(0, 1);
+        ExecutorTick();
+        actor.MoveTo(3, 1);
+        Assert.NotNull(actor.Movement.Commands.Read());
+        _client.GetHabbo().IsIncapacitated = true;
+        ExecutorTick();
+
+        Assert.Equal((0, 1), (actor.X, actor.Y));
+        Assert.False(actor.Movement.HasIntent);
+        Assert.Equal(0, actor.Movement.PendingCount);
+        Assert.False(actor.HasStatus("mv"));
+        Assert.Equal(0, actor.Movement.Cursor);
+    }
+
+    [Fact]
+    public void AnnouncedWalkCannotCommitAfterPlayerBecomesIncapacitated()
+    {
+        var actor = ExecutorActor(0, 1);
+        actor.MoveTo(3, 1);
+        ExecutorTick();
+        Assert.True(actor.Movement.PendingCount > 0);
+
+        _client.GetHabbo().IsIncapacitated = true;
+        ExecutorTick();
+
+        Assert.Equal((0, 1), (actor.X, actor.Y));
+        Assert.Equal(0, actor.Movement.PendingCount);
+        Assert.False(actor.HasStatus("mv"));
+        Assert.True(actor.IsLying);
+    }
 }

@@ -8,7 +8,7 @@ namespace Plus.HabboHotel.Rooms.Chat.Commands.Moderator;
 
 internal class GiveCommand : ITargetChatCommand
 {
-    public string Key => "give";
+    public string Key => "grant";
 
     public string Parameters => "%username% %type% %amount%";
 
@@ -22,13 +22,13 @@ internal class GiveCommand : ITargetChatCommand
             return Task.CompletedTask;
         }
 
-        if (!parameters.Any()) {
-            session.SendWhisper("Please enter a currency type! (coins, duckets, diamonds, gotw or an activity point type number)");
+        if (parameters.Length < 2) {
+            session.SendWhisper("Please enter a currency type and amount! (coins, duckets, diamonds, gotw or an activity point type number)");
 
             return Task.CompletedTask;
         }
 
-        var updateVal = parameters[1];
+        var updateVal = parameters[0];
 
         switch (updateVal.ToLower()) {
             case "coins":
@@ -38,7 +38,7 @@ internal class GiveCommand : ITargetChatCommand
                         break;
                     }
 
-                    if (int.TryParse(parameters[2], out var amount)) {
+                    if (int.TryParse(parameters[1], out var amount)) {
                         lock (target.WalletSync) {
                             if (target.WalletClosed) {
                                 break;
@@ -66,7 +66,7 @@ internal class GiveCommand : ITargetChatCommand
                         break;
                     }
 
-                    if (int.TryParse(parameters[2], out var amount)) {
+                    if (int.TryParse(parameters[1], out var amount)) {
                         lock (target.WalletSync) {
                             if (target.WalletClosed) {
                                 break;
@@ -93,7 +93,7 @@ internal class GiveCommand : ITargetChatCommand
                         break;
                     }
 
-                    if (int.TryParse(parameters[2], out var amount)) {
+                    if (int.TryParse(parameters[1], out var amount)) {
                         lock (target.WalletSync) {
                             if (target.WalletClosed) {
                                 break;
@@ -121,7 +121,7 @@ internal class GiveCommand : ITargetChatCommand
                         break;
                     }
 
-                    if (int.TryParse(parameters[2], out var amount)) {
+                    if (int.TryParse(parameters[1], out var amount)) {
                         target.GotwPoints = target.GotwPoints + amount;
                         target.Client?.Send(new HabboActivityPointNotificationComposer(target.GotwPoints, amount, 103));
 
@@ -150,7 +150,7 @@ internal class GiveCommand : ITargetChatCommand
                         break;
                     }
 
-                    if (int.TryParse(parameters[2], out var amount)) {
+                    if (int.TryParse(parameters[1], out var amount)) {
                         lock (target.WalletSync) {
                             if (target.WalletClosed) {
                                 break;

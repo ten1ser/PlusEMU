@@ -556,6 +556,66 @@ public class RoomUser
         }
     }
 
+    private const double IncapacitationZOffset = 0.35;
+    private double? _incapacitationBaseZ;
+
+    public bool IsIncapacitated => GetClient()?.GetHabbo() is { IsIncapacitated: true };
+
+    public void ReconcileIncapacitation()
+    {
+        var room = GetRoom();
+
+        if (room == null) {
+            return;
+        }
+
+        lock (room.NavigationSync) {
+            ReconcileIncapacitationCore();
+        }
+    }
+
+    private void ReconcileIncapacitationCore()
+    {
+        if (!IsIncapacitated) {
+            RestoreFromIncapacitation();
+
+            return;
+        }
+
+        ClearMovement(false);
+        DanceId = 0;
+        Statusses.Remove("sit");
+        IsSitting = false;
+        SetStatus("lay", "1.0 null");
+        IsLying = true;
+
+        _incapacitationBaseZ ??= Z;
+        Z = _incapacitationBaseZ.Value - IncapacitationZOffset;
+        RotBody -= RotBody % 2;
+        RotHead = RotBody;
+        UpdateNeeded = true;
+    }
+
+    private void RestoreFromIncapacitation()
+    {
+        if (_incapacitationBaseZ is not { } baseZ) {
+            return;
+        }
+
+        _incapacitationBaseZ = null;
+
+        if (!IsLying) {
+            return;
+        }
+
+        Statusses.Remove("lay");
+        IsLying = false;
+        Z = baseZ;
+        UpdateNeeded = true;
+    }
+
+    internal void ClearIncapacitationBookkeeping() => _incapacitationBaseZ = null;
+
     public void MoveTo(Point c)
     {
         MoveTo(c.X, c.Y);
@@ -565,7 +625,7 @@ public class RoomUser
     {
         var room = GetRoom();
 
-        if (room == null) {
+        if (room == null || IsIncapacitated) {
             return;
         }
 
@@ -614,6 +674,10 @@ public class RoomUser
             return;
         }
 
+        if (IsIncapacitated) {
+            return;
+        }
+
         var front = item.SquareInFront;
 
         if (!IsBot && !TeleportEnabled && room.GetGameMap()?.Navigation is { UsesExecutor: true, Settings.ApproachAutoInteract: true } navigation
@@ -629,7 +693,7 @@ public class RoomUser
     {
         var room = GetRoom();
 
-        if (room == null) {
+        if (room == null || IsIncapacitated) {
             return;
         }
 
@@ -646,6 +710,7 @@ public class RoomUser
         X = x;
         Y = y;
         Z = z;
+        _incapacitationBaseZ = null;
     }
 
     public void UnlockWalking()
