@@ -28,6 +28,7 @@ public static class PermissionKeys
     public const string CommandCarry = "command.carry";
     public const string CommandConvertcredits = "command.convertcredits";
     public const string CommandWordquiz = "command.wordquiz";
+    public const string CommandWork = "command.work";
     public const string CommandCoords = "command.coords";
     public const string CommandDance = "command.dance";
     public const string CommandDc = "command.dc";
@@ -57,10 +58,13 @@ public static class PermissionKeys
     public const string CommandHa = "command.ha";
     public const string CommandHal = "command.hal";
     public const string CommandHit = "command.hit";
+    public const string CommandPickpocket = "command.pickpocket";
+    public const string CommandRob = "command.rob";
     public const string CommandSuperheal = "command.superheal";
     public const string CommandHidewired = "command.hidewired";
     public const string CommandIgnorewhispers = "command.ignorewhispers";
     public const string CommandIpban = "command.ipban";
+    public const string CommandJobrank = "command.jobrank";
     public const string CommandKick = "command.kick";
     public const string CommandKickbots = "command.kickbots";
     public const string CommandKickpets = "command.kickpets";
@@ -97,6 +101,7 @@ public static class PermissionKeys
     public const string CommandSpush = "command.spush";
     public const string CommandStand = "command.stand";
     public const string CommandStats = "command.stats";
+    public const string CommandStopwork = "command.stopwork";
     public const string CommandStress = "command.stress";
     public const string CommandSummon = "command.summon";
     public const string CommandSuperfastwalk = "command.superfastwalk";

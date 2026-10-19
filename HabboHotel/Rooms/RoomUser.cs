@@ -125,9 +125,49 @@ public class RoomUser
     public int UserId;
     public int VirtualId;
 
-    public int X; //byte
-    public int Y; //byte
-    public double Z;
+    private int _x; //byte
+    private int _y; //byte
+    private double _z;
+    private long _positionRevision;
+
+    public int X
+    {
+        get => _x;
+        set
+        {
+            if (_x != value) {
+                _x = value;
+                Interlocked.Increment(ref _positionRevision);
+            }
+        }
+    }
+
+    public int Y
+    {
+        get => _y;
+        set
+        {
+            if (_y != value) {
+                _y = value;
+                Interlocked.Increment(ref _positionRevision);
+            }
+        }
+    }
+
+    public double Z
+    {
+        get => _z;
+        set
+        {
+            if (_z != value) {
+                _z = value;
+                Interlocked.Increment(ref _positionRevision);
+            }
+        }
+    }
+
+    /// <summary>Bumped whenever <see cref="X"/>, <see cref="Y"/> or <see cref="Z"/> actually changes, so observers can detect a moved avatar without polling each coordinate.</summary>
+    public long PositionRevision => Volatile.Read(ref _positionRevision);
 
     public RoomUser(int habboId, uint roomId, int virtualId, Room room, GameClient? client,
         IChatEmotionsManager chatEmotions, IRewardTrackManager rewards)
@@ -558,6 +598,10 @@ public class RoomUser
 
     private const double IncapacitationZOffset = 0.35;
     private double? _incapacitationBaseZ;
+    private bool _ownsIncapacitationPose;
+    private int _incapacitationX;
+    private int _incapacitationY;
+    private double? _incapacitationRenderedZ;
 
     public bool IsIncapacitated => GetClient()?.GetHabbo() is { IsIncapacitated: true };
 
@@ -586,11 +630,32 @@ public class RoomUser
         DanceId = 0;
         Statusses.Remove("sit");
         IsSitting = false;
-        SetStatus("lay", "1.0 null");
         IsLying = true;
+        _ownsIncapacitationPose = true;
 
-        _incapacitationBaseZ ??= Z;
+        if (FindLayBed() is { } bed) {
+            // A bed owns the posture: no floor offset and no captured base Z, so a forced move onto the
+            // bed, a moved bed or a relocation is always followed exactly and revival restores cleanly.
+            _incapacitationBaseZ = null;
+            _incapacitationRenderedZ = null;
+            SetStatus("lay", $"{TextHandling.GetString(bed.Definition.Height)} null");
+            Z = bed.GetZ;
+            RotBody = bed.Rotation;
+            RotHead = bed.Rotation;
+            UpdateNeeded = true;
+
+            return;
+        }
+
+        SetStatus("lay", "1.0 null");
+        if (_incapacitationBaseZ is null || X != _incapacitationX || Y != _incapacitationY || Z != _incapacitationRenderedZ) {
+            _incapacitationBaseZ = Z;
+        }
+
         Z = _incapacitationBaseZ.Value - IncapacitationZOffset;
+        _incapacitationX = X;
+        _incapacitationY = Y;
+        _incapacitationRenderedZ = Z;
         RotBody -= RotBody % 2;
         RotHead = RotBody;
         UpdateNeeded = true;
@@ -598,11 +663,14 @@ public class RoomUser
 
     private void RestoreFromIncapacitation()
     {
-        if (_incapacitationBaseZ is not { } baseZ) {
+        if (!_ownsIncapacitationPose) {
             return;
         }
 
+        _ownsIncapacitationPose = false;
+        var baseZ = _incapacitationBaseZ;
         _incapacitationBaseZ = null;
+        _incapacitationRenderedZ = null;
 
         if (!IsLying) {
             return;
@@ -610,8 +678,35 @@ public class RoomUser
 
         Statusses.Remove("lay");
         IsLying = false;
-        Z = baseZ;
+
+        if (baseZ is { } sankFrom) {
+            Z = sankFrom;
+        }
+        else if (FindLayBed() is { } bed) {
+            Z = bed.GetZ;
+            RotBody = bed.Rotation;
+            RotHead = bed.Rotation;
+        }
+
         UpdateNeeded = true;
+    }
+
+    // Resolves the live bed (or small tent) on the user's current square, so a moved/removed item is honoured.
+    private Item? FindLayBed()
+    {
+        var room = GetRoom();
+
+        if (room == null) {
+            return null;
+        }
+
+        foreach (var item in room.GetGameMap().GetAllRoomItemForSquare(X, Y)) {
+            if (item?.Definition.InteractionType is InteractionType.Bed or InteractionType.TentSmall) {
+                return item;
+            }
+        }
+
+        return null;
     }
 
     internal void ClearIncapacitationBookkeeping() => _incapacitationBaseZ = null;
