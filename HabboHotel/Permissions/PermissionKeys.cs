@@ -28,7 +28,8 @@ public static class PermissionKeys
     public const string CommandCarry = "command.carry";
     public const string CommandConvertcredits = "command.convertcredits";
     public const string CommandWordquiz = "command.wordquiz";
-    public const string CommandWork = "command.work";
+    public const string CommandStartWork = "command.startwork";
+    public const string CommandHeal = "command.heal";
     public const string CommandCoords = "command.coords";
     public const string CommandDance = "command.dance";
     public const string CommandDc = "command.dc";
