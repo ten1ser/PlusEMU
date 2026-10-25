@@ -223,6 +223,23 @@ public class Habbo
 
     public Room? CurrentRoom { get; set; }
 
+    /// <summary>
+    /// Room the client is told to enter right after login; 0 means the home room.
+    /// </summary>
+    public uint LoginRoomId { get; set; }
+
+    /// <summary>
+    /// Tile to place the avatar on for the next room entry instead of the door, if it is still free.
+    /// Consumed by that entry whichever room it is.
+    /// </summary>
+    public RoomEntrySpot? PendingEntrySpot { get; set; }
+
+    /// <summary>
+    /// Where the avatar stood when this session disconnected, captured before the logout tasks run
+    /// and before the avatar is removed from the room. Null when the user was not in a room.
+    /// </summary>
+    public RoomEntrySpot? DisconnectSpot { get; private set; }
+
     public bool IsIncapacitated { get; set; }
 
     internal void Save()
@@ -273,6 +290,7 @@ public class Habbo
         }
 
         _disconnected = true;
+        DisconnectSpot = CaptureRoomSpot();
         Disconnected?.Invoke(this, EventArgs.Empty);
 
         try {
@@ -298,6 +316,14 @@ public class Habbo
                 Client = null;
             }
         }
+    }
+
+    private RoomEntrySpot? CaptureRoomSpot()
+    {
+        var room = CurrentRoom;
+        var user = room?.GetRoomUserManager().GetRoomUserByHabbo(Id);
+
+        return room == null || user == null ? null : new RoomEntrySpot(room.Id, user.X, user.Y, user.Z, user.RotBody);
     }
 
     public void Dispose()

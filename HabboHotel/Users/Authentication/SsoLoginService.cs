@@ -84,7 +84,7 @@ public sealed class SsoLoginService : ISsoLoginService
 
             // TODO @80O: Move to individual incoming message handlers.
             session.Send(new AvatarEffectsComposer(_avatarEffects.Capture(session.GetHabbo())));
-            session.Send(new NavigatorSettingsComposer(session.GetHabbo().HomeRoom));
+            session.Send(new NavigatorSettingsComposer(session.GetHabbo().HomeRoom, session.GetHabbo().LoginRoomId));
             session.Send(new FavouritesComposer(session.GetHabbo().FavoriteRooms));
             session.Send(new FigureSetIdsComposer(session.GetHabbo().Clothing?.GetClothingParts ?? []));
             session.Send(new UserRightsComposer(UserRightsSnapshot.Capture(session.GetHabbo().Access)));

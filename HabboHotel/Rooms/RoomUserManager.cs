@@ -324,14 +324,34 @@ public class RoomUserManager
                 model.DoorZ = (int)_room.GetGameMap().GetHeightForSquareFromData(square);
             }
 
-            if (UsesV2Movement) {
-                user.InitializePosition(model.DoorX, model.DoorY, model.DoorZ);
+            // A returning user is put back on the tile they left, once, if it is still open and unoccupied.
+            var spot = session.GetHabbo().PendingEntrySpot;
+            session.GetHabbo().PendingEntrySpot = null;
+            var map = _room.GetGameMap();
+
+            if (spot is { } s && s.RoomId == _room.Id && map.ValidTile(s.X, s.Y) && map.GetFloorStatus(new(s.X, s.Y)) != 0 &&
+                !map.SquareHasUsers(s.X, s.Y)) {
+                var z = map.SqAbsoluteHeight(s.X, s.Y);
+
+                if (UsesV2Movement) {
+                    user.InitializePosition(s.X, s.Y, z);
+                }
+                else {
+                    user.SetPos(s.X, s.Y, z);
+                }
+
+                user.SetRot(s.Rotation, false);
             }
             else {
-                user.SetPos(model.DoorX, model.DoorY, model.DoorZ);
-            }
+                if (UsesV2Movement) {
+                    user.InitializePosition(model.DoorX, model.DoorY, model.DoorZ);
+                }
+                else {
+                    user.SetPos(model.DoorX, model.DoorY, model.DoorZ);
+                }
 
-            user.SetRot(model.DoorOrientation, false);
+                user.SetRot(model.DoorOrientation, false);
+            }
         }
         else if (!user.IsBot && (session.GetHabbo().IsTeleporting || session.GetHabbo().IsHopping)) {
             Item? item = null;
