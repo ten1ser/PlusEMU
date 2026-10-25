@@ -43,6 +43,7 @@ public static class PermissionKeys
     public const string CommandEjectall = "command.ejectall";
     public const string CommandEmptyitems = "command.emptyitems";
     public const string CommandEnable = "command.enable";
+    public const string CommandEquip = "command.equip";
     public const string CommandFaceless = "command.faceless";
     public const string CommandFastwalk = "command.fastwalk";
     public const string CommandFlagme = "command.flagme";
@@ -109,6 +110,7 @@ public static class PermissionKeys
     public const string CommandTakerole = "command.takerole";
     public const string CommandTeleport = "command.teleport";
     public const string CommandTradeban = "command.tradeban";
+    public const string CommandUnequip = "command.unequip";
     public const string CommandUnfreeze = "command.unfreeze";
     public const string CommandUnload = "command.unload";
     public const string CommandUnmute = "command.unmute";
