@@ -47,8 +47,15 @@ public sealed class UserProfileService(
     IQuestManager questManager,
     IWordFilterManager wordFilterManager,
     IDatabase database, TimeProvider clock, IChatStyleManager styles,
-    IRewardTrackManager rewardTrackManager, IAccountSessionGate accountSessionGate, ISettingsManager settings) : IUserProfileService
+    IRewardTrackManager rewardTrackManager, IAccountSessionGate accountSessionGate, ISettingsManager settings,
+    IEnumerable<IAvatarLookOverlay>? lookOverlays = null) : IUserProfileService
 {
+    private readonly IAvatarLookOverlay[] _lookOverlays = lookOverlays?.ToArray() ?? [];
+
+    private string StripOverlays(Habbo habbo, string figure) => _lookOverlays.Aggregate(figure, (current, overlay) => overlay.Strip(habbo, current));
+
+    private string ApplyOverlays(Habbo habbo, string look) => _lookOverlays.Aggregate(look, (current, overlay) => overlay.Apply(habbo, current));
+
     public void ApplyMannequin(GameClient session, FigureUpdateRequest request)
     {
         var habbo = session.GetHabbo();
@@ -60,7 +67,7 @@ public sealed class UserProfileService(
 
         using var account = accountSessionGate.Enter(habbo.Id);
         var gender = request.Gender.ToUpper();
-        var look = figureManager.ProcessFigure(request.Figure, gender, wardrobe.GetClothingParts,
+        var look = figureManager.ProcessFigure(StripOverlays(habbo, request.Figure), gender, wardrobe.GetClothingParts,
             ClubAccess.LevelFor(habbo.Access));
 
         using (var connection = database.Connection()) {
@@ -72,7 +79,7 @@ public sealed class UserProfileService(
             }
         }
 
-        habbo.Look = look;
+        habbo.Look = ApplyOverlays(habbo, look);
         habbo.Gender = gender;
         var room = habbo.CurrentRoom;
         var user = room?.GetRoomUserManager().GetRoomUserByHabbo(habbo.Username);
@@ -151,10 +158,11 @@ public sealed class UserProfileService(
 
         using var account = accountSessionGate.Enter(habbo.Id);
         var gender = request.Gender.ToUpper();
-        var look = figureManager.ProcessFigure(request.Figure, gender, wardrobe.GetClothingParts,
+        // Overlays (such as worn armor) are memory-only: strip them before validating and saving the figure.
+        var look = figureManager.ProcessFigure(StripOverlays(habbo, request.Figure), gender, wardrobe.GetClothingParts,
             ClubAccess.LevelFor(habbo.Access));
 
-        if (look == habbo.Look) {
+        if (look == StripOverlays(habbo, habbo.Look)) {
             return;
         }
 
@@ -194,7 +202,7 @@ public sealed class UserProfileService(
 
         habbo.LastClothingUpdatedAt = now;
         questManager.ProgressUserQuest(session, QuestType.ProfileChangeLook);
-        habbo.Look = liveLook;
+        habbo.Look = ApplyOverlays(habbo, liveLook);
         habbo.Gender = gender.ToLower();
         rewardTrackManager.Progress(session, RewardTrackActions.ChangeFigure);
         achievementManager.ProgressAchievement(session, "ACH_AvatarLooks", 1);
