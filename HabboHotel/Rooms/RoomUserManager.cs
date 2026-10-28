@@ -451,7 +451,9 @@ public class RoomUserManager
         if (_room.CheckRights(session, true)) {
             user.SetStatus("flatctrl", "4");
             session.Send(new YouAreOwnerComposer());
-            session.Send(new YouAreControllerComposer(_room.Id, 4));
+
+            // Level 5 (staff) lets the furni info stand show room ad branding settings, which only staff with the branding permission may save.
+            session.Send(new YouAreControllerComposer(_room.Id, session.GetHabbo().Access.Can(PermissionKeys.RoomItemSaveBrandingItems) ? 5 : 4));
         }
         else if (_room.CheckRights(session, false) && _room.Group == null) {
             user.SetStatus("flatctrl", "1");

@@ -19,6 +19,44 @@ internal static class FurniExtraData
         "\"(?:w|url|id|imageUrl|href|src|clickUrl)\"\\s*:",
         RegexOptions.IgnoreCase | RegexOptions.CultureInvariant | RegexOptions.Compiled);
 
+    // Room ad images may only come from the hotel's own room ads folder (same origin, one plain file name).
+    public const string RoomAdImageFolder = "/nitro-assets/roomads/";
+
+    private static readonly Regex RoomAdImage = new(
+        @"^/nitro-assets/roomads/[A-Za-z0-9][A-Za-z0-9_-]{0,63}\.(?:png|gif|jpe?g|webp)\z",
+        RegexOptions.CultureInvariant | RegexOptions.Compiled);
+
+    public static bool IsRoomAdImage(string value) => value != null && RoomAdImage.IsMatch(value);
+
+    /// <summary>
+    /// Branding accepts one exact imageUrl pair that is empty or names a file in <see cref="RoomAdImageFolder"/>;
+    /// every other pair keeps the client image rules, so outside addresses and click links stay refused.
+    /// </summary>
+    public static bool RejectsBranding(IReadOnlyList<string> values)
+    {
+        if (values.Count % 2 != 0) {
+            return true;
+        }
+
+        var rest = new List<string>(values.Count);
+        var imageSeen = false;
+
+        for (var index = 0; index < values.Count; index += 2) {
+            var key = values[index] ?? "";
+            var value = values[index + 1] ?? "";
+
+            if (key == "imageUrl" && !imageSeen && (value.Length == 0 || IsRoomAdImage(value))) {
+                imageSeen = true;
+                continue;
+            }
+
+            rest.Add(key);
+            rest.Add(value);
+        }
+
+        return RejectsClientImage(rest);
+    }
+
     public static bool RejectsClientImage(IReadOnlyList<string> values)
     {
         for (var index = 0; index < values.Count; index++) {
