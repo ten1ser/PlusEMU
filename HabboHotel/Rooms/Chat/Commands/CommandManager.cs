@@ -126,6 +126,36 @@ public class CommandManager : ICommandManager
     }
 
     /// <summary>
+    /// Checks whether a message counts towards the public-chat flood limit, using the same lookup rules as
+    /// <see cref="Parse"/> without executing anything. Unregistered, malformed or unauthorized commands count.
+    /// </summary>
+    /// <param name="session">Session that sent the message.</param>
+    /// <param name="message">The message to inspect.</param>
+    /// <returns>True when public-chat flood control must count this message.</returns>
+    public bool CountsTowardsChatFlood(GameClient session, string message)
+    {
+        if (session == null || session.GetHabbo() == null || session.GetHabbo().CurrentRoom == null) {
+            return true;
+        }
+
+        if (message == null || !message.StartsWith(_prefix)) {
+            return true;
+        }
+
+        var key = message.Substring(_prefix.Length).Split(' ')[0];
+
+        if (string.IsNullOrWhiteSpace(key) || !_commands.TryGetValue(key.ToLower(), out var command)) {
+            return true;
+        }
+
+        if (!session.GetHabbo().Access.Can("command." + command.Key)) {
+            return true;
+        }
+
+        return command.CountsTowardsChatFlood;
+    }
+
+    /// <summary>
     /// Registers a Chat Command.
     /// </summary>
     /// <param name="commandText">Text to type for this command.</param>

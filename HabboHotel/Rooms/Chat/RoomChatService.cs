@@ -110,7 +110,9 @@ public sealed class RoomChatService(
             user.LastBubble = colour;
         }
 
-        if (!habbo.Access.Can(PermissionKeys.ModerationTool) && user.IncrementAndCheckFlood(now, out var muteTime)) {
+        if (!habbo.Access.Can(PermissionKeys.ModerationTool)
+            && commandManager.CountsTowardsChatFlood(session, message)
+            && user.IncrementAndCheckFlood(now, out var muteTime)) {
             session.Send(new FloodControlComposer(muteTime));
 
             return;

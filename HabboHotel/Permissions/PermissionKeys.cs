@@ -62,6 +62,8 @@ public static class PermissionKeys
     public const string CommandHa = "command.ha";
     public const string CommandHal = "command.hal";
     public const string CommandHit = "command.hit";
+    public const string CommandShoot = "command.shoot";
+    public const string CommandReload = "command.reload";
     public const string CommandPickpocket = "command.pickpocket";
     public const string CommandRob = "command.rob";
     public const string CommandSuperheal = "command.superheal";

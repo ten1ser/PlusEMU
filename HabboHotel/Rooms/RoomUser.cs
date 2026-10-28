@@ -129,6 +129,10 @@ public class RoomUser
     private int _y; //byte
     private double _z;
     private long _positionRevision;
+    private long _lastMovementTick = NeverMovedTick;
+
+    /// <summary>The value <see cref="LastMovementTick"/> holds while the avatar has never moved.</summary>
+    public const long NeverMovedTick = long.MinValue;
 
     public int X
     {
@@ -137,7 +141,7 @@ public class RoomUser
         {
             if (_x != value) {
                 _x = value;
-                Interlocked.Increment(ref _positionRevision);
+                MarkPositionChanged();
             }
         }
     }
@@ -149,7 +153,7 @@ public class RoomUser
         {
             if (_y != value) {
                 _y = value;
-                Interlocked.Increment(ref _positionRevision);
+                MarkPositionChanged();
             }
         }
     }
@@ -161,13 +165,26 @@ public class RoomUser
         {
             if (_z != value) {
                 _z = value;
-                Interlocked.Increment(ref _positionRevision);
+                MarkPositionChanged();
             }
         }
     }
 
     /// <summary>Bumped whenever <see cref="X"/>, <see cref="Y"/> or <see cref="Z"/> actually changes, so observers can detect a moved avatar without polling each coordinate.</summary>
     public long PositionRevision => Volatile.Read(ref _positionRevision);
+
+    /// <summary>
+    /// Monotonic timestamp of the last real coordinate change, taken from <see cref="Environment.TickCount64"/>.
+    /// Stays <see cref="NeverMovedTick"/> until the avatar moves for the first time; unchanged assignments and
+    /// body/head turning do not touch it.
+    /// </summary>
+    public long LastMovementTick => Volatile.Read(ref _lastMovementTick);
+
+    private void MarkPositionChanged()
+    {
+        Interlocked.Increment(ref _positionRevision);
+        Interlocked.Exchange(ref _lastMovementTick, Environment.TickCount64);
+    }
 
     public RoomUser(int habboId, uint roomId, int virtualId, Room room, GameClient? client,
         IChatEmotionsManager chatEmotions, IRewardTrackManager rewards)

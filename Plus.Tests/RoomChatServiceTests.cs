@@ -12,6 +12,7 @@ using Plus.HabboHotel.Items;
 using Plus.HabboHotel.Items.DataFormat;
 using Plus.HabboHotel.Items.Wired.Configuration;
 using Plus.HabboHotel.Moderation;
+using Plus.HabboHotel.Permissions;
 using Plus.HabboHotel.Quests;
 using Plus.HabboHotel.Rooms;
 using Plus.HabboHotel.Rooms.Chat;
@@ -97,6 +98,102 @@ public sealed class RoomChatServiceTests
         Assert.Empty(world.Rewards.Progresses);
     }
 
+    private static CommandManager ProductionCommands(params ICommandBase[] commands) =>
+        new(commands, TestGameClientManager.Empty, null!, new FixedClock(Now));
+
+    [Fact]
+    public async Task PermittedOptedOutCommandDoesNotIncrementChatFlood()
+    {
+        var shoot = new PolicyCommand("shoot", false);
+        var world = new World(commandManager: ProductionCommands(shoot));
+        var habbo = world.Sender.GetHabbo();
+        habbo.Access = UserAccess.Create([], [new UserPermissionOverride("command.shoot", false)],
+            registry: ["command.shoot", "command.wave"]);
+
+        for (var i = 0; i < 6; i++) {
+            await world.Service.Chat(world.Sender, ":shoot", 1);
+        }
+
+        Assert.Equal(6, shoot.Executed.Count);
+        Assert.Equal(0, world.SenderUser.ChatSpamCount);
+        Assert.Null(habbo.FloodUntil);
+        Assert.Equal(6, world.Logs.Entries.Count);
+        Assert.Empty(world.SenderPackets);
+    }
+    [Fact]
+    public async Task PlainUnknownUnauthorizedAndCountingCommandsStillIncrementChatFlood()
+    {
+        var shoot = new PolicyCommand("shoot", false);
+        var wave = new PolicyCommand("wave", true);
+        var world = new World(commandManager: ProductionCommands(shoot, wave), interceptors: [new RecordingInterceptor()]);
+        var habbo = world.Sender.GetHabbo();
+        habbo.Access = UserAccess.Create([],
+            [new UserPermissionOverride("command.shoot", false), new UserPermissionOverride("command.wave", false)],
+            registry: ["command.shoot", "command.wave"]);
+
+        await world.Service.Chat(world.Sender, "plain words", 1);
+        await world.Service.Chat(world.Sender, ":nothing", 1);
+        await world.Service.Chat(world.Sender, ":shoot", 1);
+        await world.Service.Chat(world.Sender, ":wave", 1);
+
+        Assert.Equal(3, world.SenderUser.ChatSpamCount);
+        Assert.Single(shoot.Executed);
+        Assert.Single(wave.Executed);
+
+        habbo.Access = UserAccess.Empty;
+        await world.Service.Chat(world.Sender, ":shoot", 1);
+
+        Assert.Equal(4, world.SenderUser.ChatSpamCount);
+        Assert.Single(shoot.Executed);
+    }
+    [Fact]
+    public async Task SixRapidPlainMessagesStillFloodWhileOptedOutCommandIsRegistered()
+    {
+        var world = new World(commandManager: ProductionCommands(new PolicyCommand("shoot", false)), interceptors: [new RecordingInterceptor()]);
+        var habbo = world.Sender.GetHabbo();
+        habbo.Access = UserAccess.Create([], [new UserPermissionOverride("command.shoot", false)],
+            registry: ["command.shoot"]);
+
+        for (var i = 0; i < 5; i++) {
+            await world.Service.Chat(world.Sender, "spam", 1);
+        }
+
+        Assert.Null(habbo.FloodUntil);
+        Assert.Equal(5, world.Logs.Entries.Count);
+
+        await world.Service.Chat(world.Sender, "spam", 1);
+
+        Assert.NotNull(habbo.FloodUntil);
+        Assert.Equal(5, world.Logs.Entries.Count);
+        Assert.Equal(ServerPacketHeader.FloodControlComposer, Assert.Single(world.SenderPackets).Header);
+    }
+    [Fact]
+    public async Task ExistingMuteAndKnockoutStillBlockAnOptedOutCommand()
+    {
+        var shoot = new PolicyCommand("shoot", false);
+        var world = new World(commandManager: ProductionCommands(shoot));
+        var habbo = world.Sender.GetHabbo();
+        habbo.Access = UserAccess.Create([], [new UserPermissionOverride("command.shoot", false)],
+            registry: ["command.shoot"]);
+        habbo.TimeMuted = 60;
+
+        await world.Service.Chat(world.Sender, ":shoot", 1);
+
+        Assert.Empty(shoot.Executed);
+        Assert.Equal(0, world.SenderUser.ChatSpamCount);
+        Assert.Equal(ServerPacketHeader.MutedComposer, Assert.Single(world.SenderPackets).Header);
+
+        world.SenderPackets.Clear();
+        habbo.TimeMuted = 0;
+        habbo.IsIncapacitated = true;
+
+        await world.Service.Chat(world.Sender, ":shoot", 1);
+
+        Assert.Empty(shoot.Executed);
+        Assert.Equal(0, world.SenderUser.ChatSpamCount);
+        Assert.Null(habbo.FloodUntil);
+        Assert.Empty(world.SenderPackets);
+    }
     [Fact]
     public async Task InterceptedChatGetsTheFilteredTextAndIsNotPublished()
     {
@@ -405,7 +502,8 @@ public sealed class RoomChatServiceTests
         private readonly ConcurrentDictionary<uint, Item> _floorItems;
         private uint _nextItemId = 1;
 
-        public World(TimeProvider? clock = null, IModerationManager? moderation = null, IRoomChatInterceptor[]? interceptors = null)
+        public World(TimeProvider? clock = null, IModerationManager? moderation = null, IRoomChatInterceptor[]? interceptors = null,
+            ICommandManager? commandManager = null)
         {
             clock ??= new FixedClock(Now);
             _room = (Room)RuntimeHelpers.GetUninitializedObject(typeof(Room));
@@ -448,7 +546,7 @@ public sealed class RoomChatServiceTests
             Clients.ByUserId[7] = Sender;
             Clients.ByUserId[8] = Recipient;
 
-            Service = new RoomChatService(new Styles(), Logs, Filter, Commands,
+            Service = new RoomChatService(new Styles(), Logs, Filter, commandManager ?? Commands,
                 moderation ?? DefaultProxy<IModerationManager>.Create(), Settings, Quests, Rewards, clientManager, clock, interceptors);
         }
 
@@ -499,6 +597,15 @@ public sealed class RoomChatServiceTests
         }
     }
 
+    private sealed class PolicyCommand(string key, bool countsTowardsChatFlood) : IChatCommand
+    {
+        public string Key => key;
+        public string Parameters => "";
+        public string Description => "";
+        public bool CountsTowardsChatFlood => countsTowardsChatFlood;
+        public List<string[]> Executed { get; } = [];
+        public void Execute(GameClient session, Room room, string[] parameters) => Executed.Add(parameters);
+    }
     private sealed class RecordingRoomChatService : IRoomChatService
     {
         public (string Message, int Colour) ChatRequest { get; private set; }
