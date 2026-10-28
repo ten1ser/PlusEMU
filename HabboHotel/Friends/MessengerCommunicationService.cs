@@ -24,9 +24,12 @@ public sealed class MessengerCommunicationService(
     IQuestManager quests,
     IRewardTrackManager rewards,
     IMessengerCommunicationOutput output,
-    IMessengerFriendMutationService friends) : IMessengerCommunicationService
+    IMessengerFriendMutationService friends,
+    IEnumerable<IMessengerPolicy>? policies = null) : IMessengerCommunicationService
 {
-    public Task SendMessage(GameClient session, int friendId, string text)
+    private readonly IMessengerPolicy[] _policies = policies?.ToArray() ?? [];
+
+    public async Task SendMessage(GameClient session, int friendId, string text)
     {
         var habbo = session.GetHabbo();
         var messenger = habbo.Messenger;
@@ -39,31 +42,41 @@ public sealed class MessengerCommunicationService(
         var message = wordFilter.CheckMessage(text);
 
         if (string.IsNullOrWhiteSpace(message)) {
-            return Task.CompletedTask;
+            return;
         }
 
         if (habbo.TimeMuted > 0) {
             output.Notice(session, "Oops, you're currently muted - you cannot send messages.");
 
-            return Task.CompletedTask;
+            return;
         }
 
         // Without a friend there is nothing to deliver to, so the messenger is never asked to send.
         if (messenger == null || friend == null) {
-            return Task.CompletedTask;
+            return;
+        }
+
+        foreach (var policy in _policies) {
+            if (await policy.AuthorizeMessage(habbo, friendId) is { } denial) {
+                output.Notice(session, denial);
+
+                return;
+            }
         }
 
         var error = messenger.SendMessage(friend, message);
 
         if (error == null) {
             rewards.Progress(session, RewardTrackActions.SendMessengerMessage);
+
+            foreach (var policy in _policies) {
+                await policy.MessageDelivered(habbo, friendId);
+            }
         }
 
         if (error == MessageError.Flooding) {
             output.Notice(session, "You cannot send a message, you have flooded the console.\n\nYou can send a message in 60 seconds.");
         }
-
-        return Task.CompletedTask;
     }
 
     public async Task RequestFriend(GameClient session, string username)
@@ -71,6 +84,12 @@ public sealed class MessengerCommunicationService(
         var (userId, blocked) = await messengerData.CanReceiveFriendRequests(username);
 
         if (userId == 0 || blocked) {
+            return;
+        }
+
+        if (MessengerPolicies.DenyFriendship(_policies, session.GetHabbo(), userId) is { } denial) {
+            output.Notice(session, denial);
+
             return;
         }
 

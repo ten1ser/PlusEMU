@@ -20,6 +20,15 @@ public interface IRoomChatService
     Task Whisper(GameClient session, string parameters, int colour);
 }
 
+/// <summary>
+/// Optional plugin hook for room talk and shout. It runs after commands, mutes, flood control and the word filter; returning
+/// true means the message was delivered elsewhere (for example into a phone call) and is not said in the room.
+/// </summary>
+public interface IRoomChatInterceptor
+{
+    bool TryIntercept(GameClient session, RoomUser user, string message, bool shout);
+}
+
 public sealed class RoomChatService(
     IChatStyleManager chatStyleManager,
     IChatlogManager chatlogManager,
@@ -30,8 +39,11 @@ public sealed class RoomChatService(
     IQuestManager questManager,
     IRewardTrackManager rewardTrackManager,
     IGameClientManager clientManager,
-    TimeProvider clock) : IRoomChatService
+    TimeProvider clock,
+    IEnumerable<IRoomChatInterceptor>? interceptors = null) : IRoomChatService
 {
+    private readonly IRoomChatInterceptor[] _interceptors = interceptors?.ToArray() ?? [];
+
     public Task Chat(GameClient session, string message, int colour) => PublicChat(session, message, colour, false);
 
     public Task Shout(GameClient session, string message, int colour) => PublicChat(session, message, colour, true);
@@ -130,6 +142,10 @@ public sealed class RoomChatService(
 
         if (!habbo.Access.Can(PermissionKeys.ChatFilterBypass)) {
             message = wordFilterManager.CheckMessage(message);
+        }
+
+        if (_interceptors.Any(interceptor => interceptor.TryIntercept(session, user, message, shout))) {
+            return;
         }
 
         questManager.ProgressUserQuest(session, QuestType.SocialChat);

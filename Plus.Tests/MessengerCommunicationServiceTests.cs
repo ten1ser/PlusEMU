@@ -204,6 +204,57 @@ public sealed class MessengerCommunicationServiceTests
     }
 
     [Fact]
+    public async Task PolicyDenialBlocksDeliveryAndAllowedMessagesAreReportedOnce()
+    {
+        using var f = new MessengerFixture();
+        var messenger = f.Messenger(friend: 2);
+        var sent = new List<string>();
+        messenger.MessageSend += (_, args) => sent.Add(args.Message);
+        var (session, _) = f.Session(messenger);
+        f.Filter.Output = "hello";
+        var policy = new RecordingPolicy { Denial = "You need a SIM card." };
+
+        await f.Service(policy).SendMessage(session, 2, "hello");
+
+        Assert.Empty(sent);
+        Assert.Contains("notice You need a SIM card.", f.Output.Calls);
+        Assert.Empty(policy.Delivered);
+        Assert.Empty(f.Rewards.Progressed);
+
+        policy.Denial = null;
+        await f.Service(policy).SendMessage(session, 2, "hello");
+
+        Assert.Equal(["hello"], sent);
+        Assert.Equal([2], policy.Delivered);
+    }
+
+    [Fact]
+    public void FriendshipPolicyReturnsTheFirstDenial()
+    {
+        var habbo = new Habbo { Id = 1 };
+
+        Assert.Null(MessengerPolicies.DenyFriendship([new RecordingPolicy()], habbo, 2));
+        Assert.Equal("no SIM", MessengerPolicies.DenyFriendship([new RecordingPolicy(), new RecordingPolicy { Friendship = "no SIM" }], habbo, 2));
+    }
+
+    private sealed class RecordingPolicy : IMessengerPolicy
+    {
+        public string? Denial { get; set; }
+        public string? Friendship { get; init; }
+        public List<int> Delivered { get; } = [];
+        public Task<string?> AuthorizeMessage(Habbo sender, int friendId) => Task.FromResult(Denial);
+
+        public Task MessageDelivered(Habbo sender, int friendId)
+        {
+            Delivered.Add(friendId);
+
+            return Task.CompletedTask;
+        }
+
+        public string? AuthorizeFriendship(Habbo habbo, int otherUserId) => Friendship;
+    }
+
+    [Fact]
     public async Task SendMsgHandlerDecodesFriendAndTextBeforeDelegating()
     {
         var service = new RecordingCommunication();
@@ -363,7 +414,7 @@ public sealed class MessengerCommunicationServiceTests
         public MessengerCommunicationService ServiceWithRealOutput() =>
             new(Filter, LoaderProxy(), Quests, Rewards, new MessengerCommunicationOutput(), Friends);
 
-        public MessengerCommunicationService Service() => new(Filter, LoaderProxy(), Quests, Rewards, Output, Friends);
+        public MessengerCommunicationService Service(params IMessengerPolicy[] policies) => new(Filter, LoaderProxy(), Quests, Rewards, Output, Friends, policies);
 
         // Memory-only stand-in for the persisted workflow: these tests check reward and quest ordering around the result.
         public readonly MemoryFriendMutations Friends = new();

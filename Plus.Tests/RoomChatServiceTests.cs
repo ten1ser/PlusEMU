@@ -98,6 +98,35 @@ public sealed class RoomChatServiceTests
     }
 
     [Fact]
+    public async Task InterceptedChatGetsTheFilteredTextAndIsNotPublished()
+    {
+        var interceptor = new RecordingInterceptor();
+        var world = new World(interceptors: [interceptor]);
+        world.Filter.Replacement = "filtered words";
+
+        await world.Service.Chat(world.Sender, "normal source", 2);
+        await world.Service.Shout(world.Sender, "shout source", 3);
+
+        Assert.Equal([("filtered words", false), ("filtered words", true)], interceptor.Seen);
+        Assert.Empty(world.SenderPackets);
+        Assert.Empty(world.RecipientPackets);
+        Assert.Empty(world.Quests.Progresses);
+        Assert.Equal(2, world.Logs.Entries.Count);
+    }
+
+    private sealed class RecordingInterceptor : IRoomChatInterceptor
+    {
+        public List<(string Message, bool Shout)> Seen { get; } = [];
+
+        public bool TryIntercept(GameClient session, RoomUser user, string message, bool shout)
+        {
+            Seen.Add((message, shout));
+
+            return true;
+        }
+    }
+
+    [Fact]
     public async Task BannedNormalAndShoutPublishTheirExactPacketKindsWithoutQuestProgress()
     {
         var world = new World();
@@ -376,7 +405,7 @@ public sealed class RoomChatServiceTests
         private readonly ConcurrentDictionary<uint, Item> _floorItems;
         private uint _nextItemId = 1;
 
-        public World(TimeProvider? clock = null, IModerationManager? moderation = null)
+        public World(TimeProvider? clock = null, IModerationManager? moderation = null, IRoomChatInterceptor[]? interceptors = null)
         {
             clock ??= new FixedClock(Now);
             _room = (Room)RuntimeHelpers.GetUninitializedObject(typeof(Room));
@@ -420,7 +449,7 @@ public sealed class RoomChatServiceTests
             Clients.ByUserId[8] = Recipient;
 
             Service = new RoomChatService(new Styles(), Logs, Filter, Commands,
-                moderation ?? DefaultProxy<IModerationManager>.Create(), Settings, Quests, Rewards, clientManager, clock);
+                moderation ?? DefaultProxy<IModerationManager>.Create(), Settings, Quests, Rewards, clientManager, clock, interceptors);
         }
 
         public void AddHiddenSpeechTrigger(string message)
