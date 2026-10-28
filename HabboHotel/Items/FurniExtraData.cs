@@ -29,8 +29,9 @@ internal static class FurniExtraData
     public static bool IsRoomAdImage(string value) => value != null && RoomAdImage.IsMatch(value);
 
     /// <summary>
-    /// Branding accepts one exact imageUrl pair that is empty or names a file in <see cref="RoomAdImageFolder"/>;
-    /// every other pair keeps the client image rules, so outside addresses and click links stay refused.
+    /// Branding accepts one exact imageUrl pair that is empty or names a file in <see cref="RoomAdImageFolder"/>,
+    /// plus one exact clickUrl pair whose value is empty; every other pair keeps the client image rules,
+    /// so outside addresses and click links stay refused.
     /// </summary>
     public static bool RejectsBranding(IReadOnlyList<string> values)
     {
@@ -40,6 +41,7 @@ internal static class FurniExtraData
 
         var rest = new List<string>(values.Count);
         var imageSeen = false;
+        var clickSeen = false;
 
         for (var index = 0; index < values.Count; index += 2) {
             var key = values[index] ?? "";
@@ -47,6 +49,11 @@ internal static class FurniExtraData
 
             if (key == "imageUrl" && !imageSeen && (value.Length == 0 || IsRoomAdImage(value))) {
                 imageSeen = true;
+                continue;
+            }
+
+            if (key == "clickUrl" && !clickSeen && value.Length == 0) {
+                clickSeen = true;
                 continue;
             }
 

@@ -35,10 +35,42 @@ public class RoomAdBrandingTests
     }
 
     [Fact]
+    public void BrandingAcceptsTheCompleteNativeRoomAdFormPayload()
+    {
+        Assert.False(FurniExtraData.RejectsBranding(new[] {
+            "imageUrl", "/nitro-assets/roomads/coffeehouse.png",
+            "clickUrl", "",
+            "offsetX", "0",
+            "offsetY", "0",
+            "offsetZ", "0",
+            "scale", "100",
+            "alpha", "100"
+        }));
+    }
+
+    [Theory]
+    [InlineData("clickUrl", "")]
+    [InlineData("ClickUrl", "")]
+    [InlineData("CLICKURL", "")]
+    public void BrandingRefusesASecondClickUrlPair(string key, string value)
+    {
+        Assert.True(FurniExtraData.RejectsBranding(new[] { "imageUrl", "/nitro-assets/roomads/a.png", "clickUrl", "", key, value }));
+    }
+
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("/nitro-assets/roomads/a.png")]
+    [InlineData("https://example.invalid/a")]
+    [InlineData("data:text/html,AAAA")]
+    public void BrandingRefusesANonBlankClickUrlValue(string value)
+    {
+        Assert.True(FurniExtraData.RejectsBranding(new[] { "imageUrl", "/nitro-assets/roomads/a.png", "clickUrl", value }));
+    }
+
+    [Fact]
     public void OnlyOneImagePairIsAllowedAndOtherKeysKeepTheClientImageRules()
     {
         Assert.True(FurniExtraData.RejectsBranding(new[] { "imageUrl", "/nitro-assets/roomads/a.png", "imageUrl", "/nitro-assets/roomads/b.png" }));
-        Assert.True(FurniExtraData.RejectsBranding(new[] { "imageUrl", "/nitro-assets/roomads/a.png", "clickUrl", "" }));
         Assert.True(FurniExtraData.RejectsBranding(new[] { "imageUrl", "/nitro-assets/roomads/a.png", "url", "/nitro-assets/roomads/a.png" }));
         Assert.True(FurniExtraData.RejectsBranding(new[] { "ImageUrl", "/nitro-assets/roomads/a.png" }));
         Assert.True(FurniExtraData.RejectsBranding(new[] { "imageUrl", "/nitro-assets/roomads/a.png", "offsetX", "https://example.invalid/a.png" }));
