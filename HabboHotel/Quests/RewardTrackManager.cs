@@ -1,4 +1,5 @@
 using Plus.HabboHotel.Users.Inventory.Badges;
+using System.Collections.Concurrent;
 using System.Data;
 using Dapper;
 using Microsoft.Extensions.Logging;
@@ -28,8 +29,9 @@ public sealed class RewardTrackManager : IRewardTrackManager, IStartable
     private readonly object _definitions = new();
     private readonly object _gates = new();
     private readonly Dictionary<int, object> _userGates = new();
-    private readonly Dictionary<int, Dictionary<string, UserRewardTrackState>> _users = new();
-    private readonly HashSet<int> _loaded = new();
+    // Shared by every user while each user only holds their own gate, so both maps must be safe across users.
+    private readonly ConcurrentDictionary<int, Dictionary<string, UserRewardTrackState>> _users = new();
+    private readonly ConcurrentDictionary<int, byte> _loaded = new();
     private List<RewardTrack> _tracks = new();
 
     public RewardTrackManager(ILogger<RewardTrackManager> logger, IDatabase database, IBadgeManager badgeManager, TimeProvider clock)
@@ -487,7 +489,7 @@ public sealed class RewardTrackManager : IRewardTrackManager, IStartable
 
     private bool EnsureUser(int userId)
     {
-        if (_loaded.Contains(userId)) {
+        if (_loaded.ContainsKey(userId)) {
             return true;
         }
 
@@ -528,7 +530,7 @@ public sealed class RewardTrackManager : IRewardTrackManager, IStartable
             }
 
             _users[userId] = states;
-            _loaded.Add(userId);
+            _loaded.TryAdd(userId, 0);
 
             return true;
         }

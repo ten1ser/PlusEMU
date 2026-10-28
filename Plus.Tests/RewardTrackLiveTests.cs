@@ -38,6 +38,27 @@ public class RewardTrackLiveTests
         Assert.Equal(new uint[] { ServerPacketHeader.RewardTracksComposer }, client.Sent);
     }
 
+    // Different users only hold their own gates, so simultaneous logins must not corrupt the shared progress cache.
+    [Fact]
+    public async Task SimultaneousLoginsOfDifferentUsersKeepTheProgressCacheIntact()
+    {
+        var manager = await Manager(TrackDatabase(), new BadgeDefinitions());
+        var revision = await Profile();
+        var clients = Enumerable.Range(1, 400).Select(id =>
+        {
+            var client = new TestClient(revision);
+            client.SetHabbo(new Habbo { Id = id });
+
+            return client;
+        }).ToArray();
+
+        for (var round = 0; round < 3; round++) {
+            Parallel.ForEach(clients, client => manager.SendTracks(client));
+        }
+
+        Assert.All(clients, client => Assert.Equal(Enumerable.Repeat(ServerPacketHeader.RewardTracksComposer, 3), client.Sent));
+    }
+
     [Fact]
     public async Task SendTracksReadsTheInjectedClockOnceAtANonUtcOffset()
     {
