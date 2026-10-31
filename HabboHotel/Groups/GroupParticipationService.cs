@@ -20,8 +20,10 @@ public interface IGroupParticipationService
 // Lock order is account gate, then group lock, then the database rows. Each operation holds the gate until its packets are sent,
 // so two requests from one account publish in the same order their writes commit.
 public sealed class GroupParticipationService(IGroupManager groups, IGroupInfoSnapshotService groupInfo, IGameClientManager clients,
-    IGroupParticipationStore store, IAccountSessionGate accounts) : IGroupParticipationService
+    IGroupParticipationStore store, IAccountSessionGate accounts, IEnumerable<IGroupPolicy>? policies = null) : IGroupParticipationService
 {
+    private readonly IGroupPolicy[] _policies = policies?.ToArray() ?? [];
+
     private const int MaxGroupsPerUser = 1500;
     private const string LimitMessage = "Oops, it appears that you've hit the group membership limit! You can only join upto 1,500 groups.";
 
@@ -30,7 +32,7 @@ public sealed class GroupParticipationService(IGroupManager groups, IGroupInfoSn
         var habbo = session.GetHabbo();
         using var account = accounts.Enter(habbo.Id);
 
-        if (!groups.TryGetGroup(groupId, out var found)) {
+        if (!groups.TryGetGroup(groupId, out var found) || GroupPolicies.Managed(_policies, found.Id)) {
             return Task.CompletedTask;
         }
 

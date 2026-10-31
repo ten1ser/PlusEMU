@@ -19,11 +19,14 @@ public sealed class GroupSettingsService(
     IGroupManager groups,
     IRoomManager rooms,
     IGroupInfoSnapshotService groupInfo,
-    IGroupSettingsStore store) : IGroupSettingsService
+    IGroupSettingsStore store,
+    IEnumerable<IGroupPolicy>? policies = null) : IGroupSettingsService
 {
+    private readonly IGroupPolicy[] _policies = policies?.ToArray() ?? [];
+
     public Task Update(GameClient session, GroupSettingsRequest request)
     {
-        if (!groups.TryGetGroup(request.GroupId, out var group)) {
+        if (!groups.TryGetGroup(request.GroupId, out var group) || GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 

@@ -24,13 +24,20 @@ public sealed class GroupRemovalService(
     IGameClientManager _clients,
     IGroupInfoSnapshotService _groupInfo,
     IGroupRemovalStore _store,
-    IAccountSessionGate _sessions) : IGroupRemovalService
+    IAccountSessionGate _sessions,
+    IEnumerable<IGroupPolicy>? policies = null) : IGroupRemovalService
 {
+    private readonly IGroupPolicy[] _policies = policies?.ToArray() ?? [];
+
     public Task Delete(GameClient session, int groupId)
     {
         if (!_groupManager.TryGetGroup(groupId, out var group)) {
             session.SendNotification("Oops, we couldn't find that group!");
 
+            return Task.CompletedTask;
+        }
+
+        if (GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 
@@ -98,7 +105,7 @@ public sealed class GroupRemovalService(
 
     public Task ConfirmRemove(GameClient session, int groupId, int userId)
     {
-        if (!_groupManager.TryGetGroup(groupId, out var group)) {
+        if (!_groupManager.TryGetGroup(groupId, out var group) || GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 
@@ -131,7 +138,7 @@ public sealed class GroupRemovalService(
 
     public Task Remove(GameClient session, int groupId, int userId)
     {
-        if (!_groupManager.TryGetGroup(groupId, out var group)) {
+        if (!_groupManager.TryGetGroup(groupId, out var group) || GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 

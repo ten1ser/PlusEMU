@@ -64,6 +64,32 @@ public sealed class GroupMembershipMutationServiceTests
     }
 
     [Fact]
+    public async Task PolicyManagedGroupsIgnoreNativeMembershipChanges()
+    {
+        var group = Group(members: [8], requests: [10]);
+        var store = new RecordingStore(true);
+        var (owner, sent) = Client(7, true);
+        var service = Service(group, store, new(8, "Target", "hr-1"), [new ManagedPolicy(group.Id)]);
+
+        await service.Accept(owner, group.Id, 10);
+        await service.Decline(owner, group.Id, 10);
+        await service.GiveAdmin(owner, group.Id, 8);
+
+        Assert.True(group.HasRequest(10));
+        Assert.False(group.IsAdmin(8));
+        Assert.Empty(store.Accepts);
+        Assert.Empty(sent);
+        Assert.False(GroupPolicies.Managed([new ManagedPolicy(group.Id)], group.Id + 1));
+        Assert.Equal("No", GroupPolicies.DenyPurchase([new ManagedPolicy(0), new ManagedPolicy(0, "No")], null!));
+    }
+
+    private sealed class ManagedPolicy(int groupId, string? denial = null) : IGroupPolicy
+    {
+        public bool Manages(int id) => id == groupId;
+        public string? AuthorizePurchase(Habbo habbo) => denial;
+    }
+
+    [Fact]
     public async Task UnauthorizedActorAndFailedStorePublishNothing()
     {
         var deniedGroup = Group(requests: [8]);
@@ -257,7 +283,8 @@ public sealed class GroupMembershipMutationServiceTests
         }
     }
 
-    private static GroupMembershipMutationService Service(Group group, IGroupMembershipMutationStore store, GroupMemberIdentity? identity) => new(
+    private static GroupMembershipMutationService Service(Group group, IGroupMembershipMutationStore store, GroupMemberIdentity? identity,
+        IGroupPolicy[]? policies = null) => new(
         Proxy<IGroupManager>((method, args) =>
         {
             if (method != nameof(IGroupManager.TryGetGroup)) {
@@ -279,7 +306,8 @@ public sealed class GroupMembershipMutationServiceTests
             return false;
         }),
         Proxy<IGroupMemberIdentityLookup>((method, _) => method == nameof(IGroupMemberIdentityLookup.Find) ? identity : throw new NotSupportedException(method)),
-        store);
+        store,
+        policies);
 
     private static Group Group(int[]? members = null, int[]? administrators = null, int[]? requests = null) => new(
         9, "Crew", "", "b01014s02024", 42, 7, null, 0, 1, 1, 0, false,

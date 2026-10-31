@@ -39,14 +39,24 @@ public sealed class GroupPurchaseService(
     IWordFilterManager wordFilter,
     ISettingsManager settings,
     IAccountSessionGate accounts,
-    ILogger<GroupPurchaseService> logger) : IGroupPurchaseService
+    ILogger<GroupPurchaseService> logger,
+    IEnumerable<IGroupPolicy>? policies = null) : IGroupPurchaseService
 {
+    private readonly IGroupPolicy[] _policies = policies?.ToArray() ?? [];
+
     private const string FailureMessage =
         "An error occured whilst trying to create this group.\n\nTry again. If you get this message more than once, report it at the link below.\r\rhttp://boonboards.com";
 
     public async Task Purchase(GameClient session, GroupPurchaseRequest request)
     {
         var habbo = session.GetHabbo();
+
+        if (GroupPolicies.DenyPurchase(_policies, habbo) is { } denial) {
+            session.SendNotification(denial);
+
+            return;
+        }
+
         using var account = await accounts.EnterAsync(habbo.Id);
 
         lock (habbo.WalletSync) {

@@ -25,8 +25,11 @@ public sealed class GroupAppearanceService(
     IGroupManager groups,
     IWordFilterManager wordFilter,
     IGroupInfoSnapshotService groupInfo,
-    IGroupAppearanceStore store) : IGroupAppearanceService
+    IGroupAppearanceStore store,
+    IEnumerable<IGroupPolicy>? policies = null) : IGroupAppearanceService
 {
+    private readonly IGroupPolicy[] _policies = policies?.ToArray() ?? [];
+
     public Task UpdateIdentity(GameClient session, GroupIdentityRequest request)
     {
         var name = wordFilter.CheckMessage(request.Name);
@@ -89,7 +92,8 @@ public sealed class GroupAppearanceService(
 
     private bool TryGetOwnedGroup(GameClient session, int groupId, out Group group)
     {
-        if (!groups.TryGetGroup(groupId, out var found) || found.CreatorId != session.GetHabbo().Id) {
+        if (!groups.TryGetGroup(groupId, out var found) || found.CreatorId != session.GetHabbo().Id ||
+            GroupPolicies.Managed(_policies, found.Id)) {
             group = null!;
 
             return false;

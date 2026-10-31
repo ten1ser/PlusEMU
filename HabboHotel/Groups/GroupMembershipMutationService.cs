@@ -47,11 +47,14 @@ public sealed class GroupMembershipMutationService(
     IGroupManager groups,
     IRoomManager rooms,
     IGroupMemberIdentityLookup identities,
-    IGroupMembershipMutationStore store) : IGroupMembershipMutationService
+    IGroupMembershipMutationStore store,
+    IEnumerable<IGroupPolicy>? policies = null) : IGroupMembershipMutationService
 {
+    private readonly IGroupPolicy[] _policies = policies?.ToArray() ?? [];
+
     public Task Accept(GameClient session, int groupId, int userId)
     {
-        if (!groups.TryGetGroup(groupId, out var group)) {
+        if (!groups.TryGetGroup(groupId, out var group) || GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 
@@ -85,7 +88,7 @@ public sealed class GroupMembershipMutationService(
 
     public Task Decline(GameClient session, int groupId, int userId)
     {
-        if (!groups.TryGetGroup(groupId, out var group)) {
+        if (!groups.TryGetGroup(groupId, out var group) || GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 
@@ -113,7 +116,7 @@ public sealed class GroupMembershipMutationService(
 
     private Task SetAdmin(GameClient session, int groupId, int userId, bool isAdmin)
     {
-        if (!groups.TryGetGroup(groupId, out var group)) {
+        if (!groups.TryGetGroup(groupId, out var group) || GroupPolicies.Managed(_policies, group.Id)) {
             return Task.CompletedTask;
         }
 
