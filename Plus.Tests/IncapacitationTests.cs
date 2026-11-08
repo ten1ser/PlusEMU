@@ -178,6 +178,21 @@ public partial class PlacedFurniRoomTests
         Assert.Equal("1.5 null", actor.Statusses["lay"]);
     }
 
+    [Fact]
+    public void CarriedIncapacitatedUserIsNotIncapacitatedForMovement()
+    {
+        var actor = IncapacitationPlayer(_client, 2, 2);
+        var habbo = _client.GetHabbo();
+
+        habbo.IsIncapacitated = true;
+        Assert.True(actor.IsIncapacitated);
+
+        habbo.IsCarried = true;
+
+        Assert.False(actor.IsIncapacitated);
+        Assert.True(habbo.IsIncapacitated);
+    }
+
     private RoomUser IncapacitationPlayer(TestClient client, int x, int y)
     {
         var habbo = client.GetHabbo();

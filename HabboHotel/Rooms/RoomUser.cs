@@ -620,7 +620,7 @@ public class RoomUser
     private int _incapacitationY;
     private double? _incapacitationRenderedZ;
 
-    public bool IsIncapacitated => GetClient()?.GetHabbo() is { IsIncapacitated: true };
+    public bool IsIncapacitated => GetClient()?.GetHabbo() is { IsIncapacitated: true, IsCarried: false };
 
     public void ReconcileIncapacitation()
     {

@@ -40,6 +40,10 @@ public sealed class RoomAvatarActionService(TimeProvider clock, IQuestManager qu
             return;
         }
 
+        if (habbo.IsAutopiloted) {
+            return;
+        }
+
         if (!user.IsBot) {
             room.GetWired().Dispatch(new(WiredEventKind.ClickTile) { Actor = user, X = x, Y = y });
         }

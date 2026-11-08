@@ -110,6 +110,10 @@ public sealed class FurnitureUseService(IFurnitureUseStore store, IQuestManager 
 
     private static Item? FindPermanent(Room room, GameClient session, uint itemId)
     {
+        if (session.GetHabbo() is { IsAutopiloted: true }) {
+            return null;
+        }
+
         if (!ReferenceEquals(session.GetHabbo().CurrentRoom, room)) {
             return null;
         }
@@ -145,6 +149,10 @@ public sealed class FurnitureUseService(IFurnitureUseStore store, IQuestManager 
         var habbo = session.GetHabbo();
 
         if (habbo.CurrentRoom != room) {
+            return;
+        }
+
+        if (habbo.IsAutopiloted) {
             return;
         }
 

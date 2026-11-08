@@ -40,4 +40,22 @@ public partial class PlacedFurniRoomTests
         ExecutorTick();
         Assert.DoesNotContain(_client.Packets, p => p.Header == ServerPacketHeader.UserUpdateComposer);
     }
+
+    [Fact]
+    public async Task AutopilotedUserIgnoresMoveClicks()
+    {
+        var actor = ExecutorActor(1, 1);
+        var move = new MoveAvatarEvent(new RoomAvatarActionService(TimeProvider.System, null!, null!));
+        _client.GetHabbo().IsAutopiloted = true;
+        await move.Parse(_client, ClientPacket(2, 1));
+        ExecutorTick();
+        Assert.Equal((1, 1), (actor.X, actor.Y));
+        Assert.False(actor.HasStatus("mv"));
+        Assert.DoesNotContain(_client.Packets, p => p.Header == ServerPacketHeader.UserUpdateComposer);
+
+        _client.GetHabbo().IsAutopiloted = false;
+        await move.Parse(_client, ClientPacket(2, 1));
+        ExecutorTick();
+        Assert.Equal("2,1,0", actor.Statusses["mv"]);
+    }
 }

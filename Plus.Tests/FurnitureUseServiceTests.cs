@@ -67,6 +67,45 @@ public sealed class FurnitureUseServiceTests
         Assert.Equal(0, room.TonerData.Enabled);
     }
 
+    [Fact]
+    public void AutopilotedUserCannotUseFurniture()
+    {
+        var (room, client, item) = Context();
+        var store = new Store();
+        var service = new FurnitureUseService(store, null!);
+
+        client.GetHabbo().IsAutopiloted = true;
+        service.Use(room, client, new(item.Id, 0));
+        Assert.Empty(store.Values);
+        Assert.Equal(0, room.TonerData.Enabled);
+
+        client.GetHabbo().IsAutopiloted = false;
+        service.Use(room, client, new(item.Id, 0));
+        Assert.Equal(1, room.TonerData.Enabled);
+    }
+
+    [Fact]
+    public void AutopilotedUserCannotRollDice()
+    {
+        var (room, client, item) = Context();
+        item.Definition.InteractionType = InteractionType.Dice;
+        item.ExtraData = new LegacyDataFormat { Data = "0" };
+        Set(item, "_interactors", TestItemRuntime.Interactors);
+        Set(item, "_interactionClock", TimeProvider.System);
+        var user = new RoomUser(7, (uint)room.Id, 1, room, client, TestChatEmotions.Unused, TestRewardProgress.Unused) { UserId = 7 };
+        var users = (ConcurrentDictionary<int, RoomUser>)typeof(RoomUserManager).GetField("_users", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(room.GetRoomUserManager())!;
+        users[user.VirtualId] = user;
+        var service = new FurnitureUseService(null!, null!);
+
+        client.GetHabbo().IsAutopiloted = true;
+        service.RollDice(room, client, new(item.Id, 0));
+        Assert.Equal("0", item.LegacyDataString);
+
+        client.GetHabbo().IsAutopiloted = false;
+        service.RollDice(room, client, new(item.Id, 0));
+        Assert.Equal("-1", item.LegacyDataString);
+    }
+
     private static (Room Room, GameClient Client, Item Item) Context()
     {
         var room = (Room)RuntimeHelpers.GetUninitializedObject(typeof(Room));

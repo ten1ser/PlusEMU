@@ -67,6 +67,7 @@ public static class PermissionKeys
     public const string CommandPickpocket = "command.pickpocket";
     public const string CommandRob = "command.rob";
     public const string CommandSuperheal = "command.superheal";
+    public const string CommandKillself = "command.killself";
     public const string CommandHidewired = "command.hidewired";
     public const string CommandIgnorewhispers = "command.ignorewhispers";
     public const string CommandIpban = "command.ipban";

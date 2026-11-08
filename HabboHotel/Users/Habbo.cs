@@ -242,6 +242,12 @@ public class Habbo
 
     public bool IsIncapacitated { get; set; }
 
+    /// <summary>A plugin is carrying this knocked-out avatar: the room lets the server walk it upright while IsIncapacitated stays true.</summary>
+    public bool IsCarried { get; set; }
+
+    /// <summary>A plugin is walking this avatar on autopilot: the player's own walk and furniture-use clicks are ignored.</summary>
+    public bool IsAutopiloted { get; set; }
+
     internal void Save()
     {
         lock (WalletSync) {
