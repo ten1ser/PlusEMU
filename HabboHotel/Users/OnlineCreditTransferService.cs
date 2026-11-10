@@ -74,73 +74,74 @@ public sealed class OnlineCreditTransferService(IOnlineCreditTransferStore store
         var second = senderId < recipientId ? recipientHabbo : senderHabbo;
 
         lock (first.WalletSync)
-        lock (second.WalletSync) {
-            // The exact captured sessions must still be the live, authenticated clients for these ids under the wallet lock.
-            if (!IsCurrent(sender, senderHabbo) || !IsCurrent(recipient, recipientHabbo)) {
-                return new(false, PlayerUnavailable, senderHabbo.Credits, recipientHabbo.Credits);
+            lock (second.WalletSync) {
+                // The exact captured sessions must still be the live, authenticated clients for these ids under the wallet lock.
+                if (!IsCurrent(sender, senderHabbo) || !IsCurrent(recipient, recipientHabbo)) {
+                    return new(false, PlayerUnavailable, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                if (senderHabbo.WalletClosed || recipientHabbo.WalletClosed) {
+                    return new(false, WalletClosed, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                // Corrupt balances outside the valid wire range are refused instead of arithmetically wrapped.
+                if (GrantOutcome.CheckBalance(senderHabbo.Credits) is { } existingSenderError) {
+                    return new(false, existingSenderError, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                if (GrantOutcome.CheckBalance(recipientHabbo.Credits) is { } existingRecipientError) {
+                    return new(false, existingRecipientError, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                var senderAfter = (long)senderHabbo.Credits - amount;
+
+                if (GrantOutcome.CheckBalance(senderAfter) is { } senderError) {
+                    return new(false, senderError, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                var recipientAfter = (long)recipientHabbo.Credits + amount;
+
+                if (GrantOutcome.CheckBalance(recipientAfter) is { } recipientError) {
+                    return new(false, recipientError, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                // Preflight: refuse before touching the database when a participant already stopped being eligible.
+                if (!stillEligible()) {
+                    return new(false, NoLongerValid, senderHabbo.Credits, recipientHabbo.Credits);
+                }
+
+                var senderBefore = senderHabbo.Credits;
+                var recipientBefore = recipientHabbo.Credits;
+                (string? Error, int SenderBalance, int RecipientBalance) result;
+
+                try {
+                    result = store.Transfer(senderId, (int)senderAfter, recipientId, (int)recipientAfter, (connection, transaction) =>
+                    {
+                        // The receipt is written first; the final identity and eligibility check runs immediately before commit.
+                        beforeCommit?.Invoke(connection, transaction, senderBefore, (int)senderAfter, recipientBefore, (int)recipientAfter);
+
+                        if (!IsCurrent(sender, senderHabbo) || !IsCurrent(recipient, recipientHabbo) || !stillEligible()) {
+                            throw new CreditTransferInvalidatedException();
+                        }
+                    });
+                }
+                catch (CreditTransferInvalidatedException) {
+                    return new(false, NoLongerValid, senderBefore, recipientBefore);
+                }
+
+                if (result.Error != null) {
+                    return new(false, result.Error, senderBefore, recipientBefore);
+                }
+
+                // Memory is authoritative only after the transaction committed both rows.
+                senderHabbo.Credits = result.SenderBalance;
+                recipientHabbo.Credits = result.RecipientBalance;
+
+                Notify(sender, senderHabbo, result.SenderBalance);
+                Notify(recipient, recipientHabbo, result.RecipientBalance);
+
+                return new(true, null, result.SenderBalance, result.RecipientBalance);
             }
-
-            if (senderHabbo.WalletClosed || recipientHabbo.WalletClosed) {
-                return new(false, WalletClosed, senderHabbo.Credits, recipientHabbo.Credits);
-            }
-
-            // Corrupt balances outside the valid wire range are refused instead of arithmetically wrapped.
-            if (GrantOutcome.CheckBalance(senderHabbo.Credits) is { } existingSenderError) {
-                return new(false, existingSenderError, senderHabbo.Credits, recipientHabbo.Credits);
-            }
-
-            if (GrantOutcome.CheckBalance(recipientHabbo.Credits) is { } existingRecipientError) {
-                return new(false, existingRecipientError, senderHabbo.Credits, recipientHabbo.Credits);
-            }
-
-            var senderAfter = (long)senderHabbo.Credits - amount;
-
-            if (GrantOutcome.CheckBalance(senderAfter) is { } senderError) {
-                return new(false, senderError, senderHabbo.Credits, recipientHabbo.Credits);
-            }
-
-            var recipientAfter = (long)recipientHabbo.Credits + amount;
-
-            if (GrantOutcome.CheckBalance(recipientAfter) is { } recipientError) {
-                return new(false, recipientError, senderHabbo.Credits, recipientHabbo.Credits);
-            }
-
-            // Preflight: refuse before touching the database when a participant already stopped being eligible.
-            if (!stillEligible()) {
-                return new(false, NoLongerValid, senderHabbo.Credits, recipientHabbo.Credits);
-            }
-
-            var senderBefore = senderHabbo.Credits;
-            var recipientBefore = recipientHabbo.Credits;
-            (string? Error, int SenderBalance, int RecipientBalance) result;
-
-            try {
-                result = store.Transfer(senderId, (int)senderAfter, recipientId, (int)recipientAfter, (connection, transaction) => {
-                    // The receipt is written first; the final identity and eligibility check runs immediately before commit.
-                    beforeCommit?.Invoke(connection, transaction, senderBefore, (int)senderAfter, recipientBefore, (int)recipientAfter);
-
-                    if (!IsCurrent(sender, senderHabbo) || !IsCurrent(recipient, recipientHabbo) || !stillEligible()) {
-                        throw new CreditTransferInvalidatedException();
-                    }
-                });
-            }
-            catch (CreditTransferInvalidatedException) {
-                return new(false, NoLongerValid, senderBefore, recipientBefore);
-            }
-
-            if (result.Error != null) {
-                return new(false, result.Error, senderBefore, recipientBefore);
-            }
-
-            // Memory is authoritative only after the transaction committed both rows.
-            senderHabbo.Credits = result.SenderBalance;
-            recipientHabbo.Credits = result.RecipientBalance;
-
-            Notify(sender, senderHabbo, result.SenderBalance);
-            Notify(recipient, recipientHabbo, result.RecipientBalance);
-
-            return new(true, null, result.SenderBalance, result.RecipientBalance);
-        }
     }
 
     private bool IsCurrent(GameClient client, Habbo habbo) => client is { IsAuthenticated: true } &&

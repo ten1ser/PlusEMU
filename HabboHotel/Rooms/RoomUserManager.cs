@@ -374,6 +374,7 @@ public class RoomUserManager
                     }
 
                     user.SetRot(item.Rotation, false);
+
                     if (item.Definition.IsStepThroughArrow) {
                         user.ArrivalArrowId = item.Id;
                     }

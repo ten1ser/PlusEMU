@@ -55,10 +55,12 @@ public partial class ModernWiredRuntimeTests
         var partner = MakeItem(6, "wf_room_linker");
         partner.Definition.InteractionType = InteractionType.WiredRoomLinker;
         partner.Definition.Modes = 1;
+
         if (stepThrough) {
             partner.Definition.InteractionType = InteractionType.Arrow;
             partner.Definition.IsStepThroughArrow = true;
         }
+
         partner.ExtraData = new LegacyDataFormat { Data = "" };
         Assert.True(destination.GetRoomItemHandler().SetFloorItem(null!, partner, 2, 1, 0, true, false, false));
         f.Habbo.IsTeleporting = true;

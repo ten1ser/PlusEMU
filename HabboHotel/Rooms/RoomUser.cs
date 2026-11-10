@@ -665,6 +665,7 @@ public class RoomUser
         }
 
         SetStatus("lay", "1.0 null");
+
         if (_incapacitationBaseZ is null || X != _incapacitationX || Y != _incapacitationY || Z != _incapacitationRenderedZ) {
             _incapacitationBaseZ = Z;
         }
